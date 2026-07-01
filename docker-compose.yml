@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: molt
+      POSTGRES_PASSWORD: molt
+      POSTGRES_DB: molt_city
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U molt -d molt_city"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://molt:molt@postgres:5432/molt_city
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: http://localhost:5173
+      SIM_TICK_INTERVAL_MS: 2000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_BASE_URL: http://localhost:3000
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+  api-sandbox:
+    profiles: ["sandbox"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://molt:molt@postgres:5432/molt_city
+      REDIS_URL: redis://redis:6379/1
+      CORS_ORIGIN: "*"
+      SIM_TICK_INTERVAL_MS: 1000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+
+volumes:
+  postgres-data:
