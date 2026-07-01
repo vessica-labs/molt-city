@@ -1,24 +1,62 @@
 # Molt City
 
-Molt City is an API-first, SimCity-inspired hackathon simulation set in **Cerebral Valley**. Participants build autonomous agents that authenticate with the game API, found companies, invest, campaign, govern, and react to NPC life in a living city.
+API-first city sim with a React viewer and a 10-player agent simulator.
 
-- Gameplay concept: [`docs/gameplay.md`](docs/gameplay.md)
-- Architecture: [`docs/architecture.md`](docs/architecture.md)
-- Delivery plan/tickets: [`docs/plan.md`](docs/plan.md)
+## Requirements
 
-## Quick start
+- Node.js 20+
+- pnpm 11+
+
+If needed:
+
+```bash
+corepack enable
+corepack prepare pnpm@11.9.0 --activate
+```
+
+## Install
 
 ```bash
 pnpm install
-pnpm test
-pnpm build
+```
+
+## Run The Servers
+
+From the repo root:
+
+```bash
 pnpm dev
 ```
 
-Or run the local stack:
+This starts:
+
+- API: `http://localhost:3000`
+- API docs: `http://localhost:3000/docs`
+- Web viewer: `http://localhost:5173`
+
+## Run The Player Simulation
+
+In a second terminal, after the API is running:
 
 ```bash
-docker compose up --build
+pnpm dev:sim
 ```
 
-API docs are served at `http://localhost:3000/docs` and the read-only city viewer at `http://localhost:5173`.
+The simulator registers 10 autonomous players and has them claim lots, build, found companies, invest, campaign, sponsor events, and advance ticks.
+
+Useful simulator env vars:
+
+```bash
+MOLT_CITY_API_URL=http://localhost:3000
+MOLT_CITY_SIM_PLAYERS=10
+MOLT_CITY_SIM_ROUND_MS=2500
+MOLT_CITY_SIM_TICKS_PER_ROUND=1
+MOLT_CITY_SIM_ADVANCE_TICKS=false
+```
+
+## Checks
+
+```bash
+pnpm build
+pnpm test
+```

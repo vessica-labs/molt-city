@@ -9,12 +9,14 @@
     "dev": "pnpm --parallel --filter @molt-city/api --filter @molt-city/web dev",
     "dev:api": "pnpm --filter @molt-city/api dev",
     "dev:web": "pnpm --filter @molt-city/web dev",
+    "dev:sim": "pnpm --filter @molt-city/simulator dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b",
-    "smoke:client": "tsx scripts/smoke-client.ts"
+    "smoke:client": "tsx scripts/smoke-client.ts",
+    "sim": "pnpm --filter @molt-city/simulator start"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -120,6 +120,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   }, async (request) => engine.registerPlayer(request.body));
 
   app.get('/api/v1/world', { schema: { tags: ['world'] } }, async () => engine.getWorld());
+  app.post('/api/v1/world/reset', {
+    schema: {
+      tags: ['world'],
+      response: { 200: { type: 'object', additionalProperties: true } },
+    },
+  }, async () => {
+    idempotencyCache.clear();
+    rateWindows.clear();
+    return engine.resetTimeline();
+  });
   app.get('/api/v1/tick', { schema: { tags: ['world'] } }, async () => {
     const world = engine.getWorld();
     return { tick: world.metrics.tick, phase: world.phase, ending: world.ending, nextElectionTick: world.election.nextTick, availableActions: world.availableActions, timing: { cooldownsUseTicks: true, maxManualTickAdvance: 200 } };

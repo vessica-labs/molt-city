@@ -6,12 +6,12 @@ const MAP_SCALE = 0.55;
 const ROAD_Y = 0.09;
 const LOT_Y = 0.2;
 const zoneColors = {
-    residential: 0xf7cc7b,
-    commercial: 0x72dbff,
-    industrial: 0x9e97f0,
-    civic: 0xff9fc6,
-    park: 0x5dd977,
-    mixed: 0xd7f4ff,
+    residential: 0xf0a94d,
+    commercial: 0x27b9e8,
+    industrial: 0x7468d8,
+    civic: 0xf46aa3,
+    park: 0x35b85d,
+    mixed: 0x54cbd2,
 };
 const moodColors = {
     happy: 0x20d39b,
@@ -66,8 +66,8 @@ class CityRenderer {
     constructor(container) {
         this.container = container;
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0xbfefff);
-        this.scene.fog = new THREE.FogExp2(0xbfefff, 0.013);
+        this.scene.background = new THREE.Color(0x89ddf5);
+        this.scene.fog = new THREE.FogExp2(0x89ddf5, 0.008);
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
         this.camera.position.set(43, 38, 43);
         this.camera.lookAt(new THREE.Vector3(0, 0, 0));
@@ -78,7 +78,7 @@ class CityRenderer {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.12;
+        this.renderer.toneMappingExposure = 0.96;
         this.renderer.domElement.className = 'threeCanvas';
         this.container.appendChild(this.renderer.domElement);
         this.waterMaterial = createWaterMaterial();
@@ -96,7 +96,7 @@ class CityRenderer {
     setWorld(world) {
         this.visualWorld = world ?? createPreviewWorld();
         const pollution = this.visualWorld.metrics.pollution;
-        this.scene.fog = new THREE.FogExp2(pollution > 42 ? 0xb7c4cf : 0xbfefff, 0.011 + Math.min(0.011, pollution * 0.00012));
+        this.scene.fog = new THREE.FogExp2(pollution > 42 ? 0x9eb0ba : 0x89ddf5, 0.007 + Math.min(0.008, pollution * 0.00009));
         this.rebuildCity(this.visualWorld);
         this.syncPeople(this.visualWorld.npcs);
     }
@@ -183,9 +183,9 @@ class CityRenderer {
         this.animationFrame = requestAnimationFrame(this.animate);
     };
     setupLights() {
-        const hemi = new THREE.HemisphereLight(0xe8fbff, 0x76aa62, 2.8);
+        const hemi = new THREE.HemisphereLight(0xd6f8ff, 0x4c8d4d, 2.25);
         this.scene.add(hemi);
-        const sun = new THREE.DirectionalLight(0xfff0c7, 5.6);
+        const sun = new THREE.DirectionalLight(0xffdf9f, 5.1);
         sun.position.set(-28, 52, -32);
         sun.castShadow = true;
         sun.shadow.mapSize.set(2048, 2048);
@@ -196,7 +196,7 @@ class CityRenderer {
         sun.shadow.camera.near = 1;
         sun.shadow.camera.far = 140;
         this.scene.add(sun);
-        const rim = new THREE.DirectionalLight(0x7ad7ff, 1.8);
+        const rim = new THREE.DirectionalLight(0x27c7ff, 1.45);
         rim.position.set(34, 26, 26);
         this.scene.add(rim);
         const glow = new THREE.PointLight(0xff76c7, 65, 45, 2.2);
@@ -208,32 +208,32 @@ class CityRenderer {
         sunDisc.position.set(-42, 42, -44);
         this.atmosphereGroup.add(sunDisc);
         const groundTexture = createTerrainTexture();
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 57, 1, 1), new THREE.MeshStandardMaterial({ map: groundTexture, color: 0xffffff, roughness: 0.94, metalness: 0.02 }));
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 57, 1, 1), new THREE.MeshStandardMaterial({ map: groundTexture, color: 0xe6ffe3, roughness: 0.9, metalness: 0.02 }));
         ground.rotation.x = -Math.PI / 2;
         ground.position.set(-5, 0, 0);
         ground.receiveShadow = true;
         this.atmosphereGroup.add(ground);
-        const base = new THREE.Mesh(new THREE.BoxGeometry(70, 1.2, 57), new THREE.MeshStandardMaterial({ color: 0x37715e, roughness: 0.98 }));
+        const base = new THREE.Mesh(new THREE.BoxGeometry(70, 1.2, 57), new THREE.MeshStandardMaterial({ color: 0x236747, roughness: 0.98 }));
         base.position.set(-5, -0.76, 0);
         base.receiveShadow = true;
         this.atmosphereGroup.add(base);
-        const water = new THREE.Mesh(new THREE.PlaneGeometry(68, 96, 120, 120), this.waterMaterial);
+        const water = new THREE.Mesh(new THREE.PlaneGeometry(48, 96, 120, 120), this.waterMaterial);
         water.rotation.x = -Math.PI / 2;
-        water.position.set(38, -0.06, 0);
+        water.position.set(55.5, -0.16, 0);
         water.receiveShadow = true;
         this.atmosphereGroup.add(water);
-        const seawall = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.48, 58), new THREE.MeshStandardMaterial({ color: 0xceddd8, roughness: 0.72, metalness: 0.08 }));
-        seawall.position.set(20.4, 0.15, 0);
+        const seawall = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.48, 58), new THREE.MeshStandardMaterial({ color: 0x9eaeb4, roughness: 0.72, metalness: 0.08 }));
+        seawall.position.set(30.55, 0.15, 0);
         seawall.castShadow = true;
         seawall.receiveShadow = true;
         this.atmosphereGroup.add(seawall);
         for (let i = 0; i < 5; i += 1) {
             const foam = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 58, 1, 1), new THREE.MeshBasicMaterial({ color: 0xf6ffff, transparent: true, opacity: 0.22 - i * 0.025, side: THREE.DoubleSide }));
             foam.rotation.x = -Math.PI / 2;
-            foam.position.set(21.2 + i * 0.72, 0.022, 0);
+            foam.position.set(31.55 + i * 0.72, 0.018, 0);
             this.atmosphereGroup.add(foam);
         }
-        const hillMaterial = new THREE.MeshStandardMaterial({ color: 0x6bbd8f, roughness: 0.9, flatShading: true });
+        const hillMaterial = new THREE.MeshStandardMaterial({ color: 0x3ea369, roughness: 0.88, flatShading: true });
         for (let i = 0; i < 7; i += 1) {
             const hill = new THREE.Mesh(new THREE.ConeGeometry(4 + i * 0.28, 6 + (i % 3) * 1.6, 5), hillMaterial.clone());
             hill.position.set(-39 + i * 5.3, 2.15, -34 - (i % 2) * 2.8);
@@ -272,7 +272,7 @@ class CityRenderer {
         }
         for (let i = 0; i < 3; i += 1) {
             const boat = createBoat(i === 0 ? 0xfff7d6 : i === 1 ? 0x9cecff : 0xff9fc6);
-            boat.position.set(34 + i * 7, 0.18, -22 + i * 20);
+            boat.position.set(45 + i * 7, 0.18, -22 + i * 20);
             this.boats.push({ group: boat, baseZ: boat.position.z, speed: 0.24 + i * 0.07, phase: i * 1.8 });
             this.trafficGroup.add(boat);
         }
@@ -281,9 +281,10 @@ class CityRenderer {
         clearGroup(this.cityGroup, true);
         this.addRoadNetwork(world.lots);
         const buildingsByLot = new Map(world.buildings.map((building) => [building.lotId, building]));
+        const companiesByLot = companiesByLotDevelopment(world.companies);
         const lots = [...world.lots].sort((a, b) => a.coordinates.y - b.coordinates.y || a.coordinates.x - b.coordinates.x);
         for (const lot of lots) {
-            this.addLot(lot, buildingsByLot.get(lot.id), world.metrics.tick);
+            this.addLot(lot, buildingsByLot.get(lot.id), companiesByLot.get(lot.id), world.metrics.tick);
         }
         this.addDistrictLabels(world.lots);
         this.addMetricBadges(world);
@@ -328,7 +329,7 @@ class CityRenderer {
             }
         }
     }
-    addLot(lot, building, tick) {
+    addLot(lot, building, company, tick) {
         const position = gridToWorld(lot.coordinates);
         const group = new THREE.Group();
         group.position.copy(position);
@@ -346,7 +347,7 @@ class CityRenderer {
         group.add(bevel);
         addLotSurfaceDetails(group, lot, width, depth);
         if (building) {
-            const model = createBuildingModel(building, lot, tick);
+            const model = createBuildingModel(building, lot, company, tick);
             model.position.y = LOT_Y + 0.19;
             group.add(model);
         }
@@ -519,11 +520,13 @@ function createOwnershipGlow(width, depth) {
     ring.position.y = LOT_Y + 0.185;
     return ring;
 }
-function createBuildingModel(building, lot, tick) {
+function createBuildingModel(building, lot, company, tick) {
     const group = new THREE.Group();
     const width = Math.min(lotWidth(lot) * 0.72, 5.8 + lot.size * 0.3);
     const depth = Math.min(lotDepth(lot) * 0.67, 5.6 + lot.size * 0.25);
-    const height = buildingHeight(building);
+    const baseHeight = buildingHeight(building);
+    const roofline = renderedRoofline(building, baseHeight);
+    const height = company ? companyHeight(building, company) : baseHeight;
     switch (building.type) {
         case 'garage':
             createGarage(group, building, width, depth);
@@ -564,6 +567,9 @@ function createBuildingModel(building, lot, tick) {
     if (building.underConstructionUntilTick && building.underConstructionUntilTick > tick) {
         addConstructionOverlay(group, width, depth, Math.max(2.6, height));
     }
+    if (company) {
+        addBusinessGrowth(group, building, company, width, depth, roofline, height);
+    }
     const name = createTextSprite(shortLabel(building.name), { background: 'rgba(19,26,58,.72)', color: '#eaffff', accent: '#6ee7ff' });
     name.position.set(0, Math.max(2.7, height + 1.15), -depth * 0.56);
     name.scale.multiplyScalar(0.36);
@@ -585,6 +591,135 @@ function buildingHeight(building) {
         mixed_use_tower: 12.4,
     };
     return Math.min(18, typeBase[building.type] + building.level * 0.72 + building.jobs * 0.08 + building.compute * 0.12);
+}
+function renderedRoofline(building, computedHeight) {
+    const fixedTypeRoofline = {
+        garage: 2.65,
+        coffee_shop: 2.55,
+        data_center_greenhouse: 4.85,
+        model_foundry: 7.9,
+        civic_hall: 5.05,
+        transit_kiosk: 1.7,
+        pony_meadow: 2.15,
+        concert_shell: 3.15,
+    };
+    return fixedTypeRoofline[building.type] ?? computedHeight;
+}
+function companyHeight(building, company) {
+    const stageBoost = {
+        garage: 0,
+        seed: 1.4,
+        series_a: 3.2,
+        growth: 5.6,
+        'public-ish': 8.4,
+        failed: 0,
+    };
+    const valuationBoost = Math.log10(Math.max(1, company.valuation / 3_000)) * 4.8;
+    const researchBoost = Math.min(3.2, company.research / 2_000);
+    const marketBoost = company.marketShare / 16;
+    const capitalBoost = Math.max(0, Math.log10(Math.max(1, company.cash + 1_200)) - 3) * 1.4;
+    return Math.min(30, buildingHeight(building) + (stageBoost[company.stage] ?? 0) + valuationBoost + researchBoost + marketBoost + capitalBoost);
+}
+function companiesByLotDevelopment(companies) {
+    const byLot = new Map();
+    for (const company of companies) {
+        const existing = byLot.get(company.lotId);
+        if (!existing || companyDevelopmentScore(company) > companyDevelopmentScore(existing)) {
+            byLot.set(company.lotId, company);
+        }
+    }
+    return byLot;
+}
+function companyDevelopmentScore(company) {
+    const stageScore = {
+        garage: 0,
+        seed: 8_000,
+        series_a: 22_000,
+        growth: 46_000,
+        'public-ish': 90_000,
+        failed: 0,
+    };
+    return company.valuation + company.research * 4 + company.marketShare * 950 + (stageScore[company.stage] ?? 0);
+}
+function addBusinessGrowth(group, building, company, width, depth, baseHeight, height) {
+    const growth = Math.max(0, height - baseHeight);
+    const color = companyColor(company.archetype);
+    const isFailed = company.stage === 'failed';
+    const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: isFailed ? 0.18 : 0.42, roughness: 0.25, metalness: 0.28, transparent: true, opacity: isFailed ? 0.62 : 0.88 });
+    const trim = new THREE.MeshStandardMaterial({ color: 0xeaffff, emissive: color, emissiveIntensity: 0.75, roughness: 0.28, metalness: 0.18 });
+    if (growth > 1.1) {
+        const towerHeight = Math.max(1.6, growth * 0.72);
+        const towerWidth = width * (building.type === 'garage' || building.type === 'coffee_shop' ? 0.5 : 0.38);
+        const towerDepth = depth * (building.type === 'garage' || building.type === 'coffee_shop' ? 0.46 : 0.36);
+        addBlock(group, towerWidth, towerHeight, towerDepth, width * 0.13, baseHeight + towerHeight / 2, depth * 0.04, glow);
+        addWindows(group, towerWidth, towerHeight - 0.2, towerDepth, baseHeight, Math.floor(towerHeight * 1.5), `${company.id}:growth`);
+    }
+    if (growth > 3.4) {
+        const secondHeight = Math.max(1.2, growth * 0.46);
+        addBlock(group, width * 0.28, secondHeight, depth * 0.3, -width * 0.2, baseHeight + secondHeight / 2, -depth * 0.1, glow.clone());
+        addNeonStrip(group, -width * 0.18, baseHeight + secondHeight + 0.16, -depth * 0.28, width * 0.32, color);
+    }
+    if (growth > 5.8 || company.stage === 'growth' || company.stage === 'public-ish') {
+        const crown = new THREE.Mesh(new THREE.CylinderGeometry(width * 0.2, width * 0.28, 0.52, 6), trim);
+        crown.position.set(0, height + 0.36, 0);
+        crown.rotation.y = Math.PI / 6;
+        crown.castShadow = true;
+        group.add(crown);
+        addAntenna(group, width * 0.2, height + 0.45, -depth * 0.08, color);
+    }
+    if (height >= 6.4 || companyDevelopmentScore(company) > 18_000) {
+        addRooftopCompanySign(group, company, width, depth, height, color);
+    }
+}
+function addRooftopCompanySign(group, company, width, depth, height, color) {
+    const isFailed = company.stage === 'failed';
+    const signText = isFailed ? `${shortCompanyLabel(company.name)} RIP` : shortCompanyLabel(company.name);
+    const sign = createTextSprite(signText, { background: isFailed ? 'rgba(45,45,58,.82)' : 'rgba(15,22,55,.86)', color: '#f5ffff', accent: `#${color.toString(16).padStart(6, '0')}` });
+    sign.position.set(0, height + 1.45, -depth * 0.56);
+    sign.scale.set(Math.max(8.2, width * 1.55), 2.05, 1);
+    sign.renderOrder = 30;
+    sign.material.depthTest = false;
+    group.add(sign);
+    const facade = createTextSprite(signText, { background: isFailed ? 'rgba(235,239,236,.74)' : 'rgba(255,255,255,.86)', color: isFailed ? '#45495a' : '#17204f', accent: `#${color.toString(16).padStart(6, '0')}` });
+    facade.position.set(0, Math.max(2.4, height - 0.75), -depth * 0.55);
+    facade.scale.set(Math.max(5.8, width * 1.15), 1.35, 1);
+    facade.renderOrder = 29;
+    facade.material.depthTest = false;
+    group.add(facade);
+    const posts = new THREE.Group();
+    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x1c244a, roughness: 0.42, metalness: 0.55 });
+    for (const x of [-width * 0.28, width * 0.28]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.05, 0.08), postMaterial.clone());
+        post.position.set(x, height + 0.52, -depth * 0.53);
+        posts.add(post);
+    }
+    const railMaterial = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.2, roughness: 0.24 });
+    const topRail = new THREE.Mesh(new THREE.BoxGeometry(Math.max(4.6, width * 1.05), 0.07, 0.08), railMaterial);
+    topRail.position.set(0, height + 1.72, -depth * 0.54);
+    const bottomRail = topRail.clone();
+    bottomRail.position.y = height + 0.62;
+    posts.add(topRail, bottomRail);
+    group.add(posts);
+}
+function companyColor(archetype) {
+    const colors = {
+        search: 0x4cc9f0,
+        enterprise: 0x9b8cff,
+        frontier_ai: 0x40ffe0,
+        social: 0xff66c4,
+        robotics: 0xffd166,
+        local_services: 0x66e084,
+        finance: 0xff8c42,
+    };
+    return colors[archetype] ?? 0x6ee7ff;
+}
+function shortCompanyLabel(name) {
+    const stopwords = new Set(['the', 'and', 'of', 'for']);
+    const words = name.split(/\s+/).filter((word) => word && !stopwords.has(word.toLowerCase()));
+    if (words.length <= 2)
+        return name.toUpperCase();
+    const core = words.slice(0, 3).map((word) => word.replace(/[^a-z0-9]/gi, '')).filter(Boolean);
+    return core.join(' ').toUpperCase();
 }
 function createGarage(group, building, width, depth) {
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x7161d9, roughness: 0.78, metalness: 0.05 });
@@ -1053,20 +1188,20 @@ function createTerrainTexture() {
     const ctx = canvas.getContext('2d');
     if (ctx) {
         const gradient = ctx.createLinearGradient(0, 0, 512, 512);
-        gradient.addColorStop(0, '#9be68c');
-        gradient.addColorStop(0.45, '#69cf83');
-        gradient.addColorStop(1, '#48b875');
+        gradient.addColorStop(0, '#82d56e');
+        gradient.addColorStop(0.45, '#44bb68');
+        gradient.addColorStop(1, '#27955a');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 512, 512);
-        ctx.globalAlpha = 0.18;
+        ctx.globalAlpha = 0.14;
         for (let i = 0; i < 720; i += 1) {
             const x = (i * 37) % 512;
             const y = (i * 91) % 512;
-            ctx.fillStyle = i % 3 ? '#ffffff' : '#2f9f66';
+            ctx.fillStyle = i % 3 ? '#e8ffdc' : '#167947';
             ctx.fillRect(x, y, 1 + (i % 2), 1 + (i % 3));
         }
-        ctx.globalAlpha = 0.11;
-        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.08;
+        ctx.strokeStyle = '#eaffdd';
         for (let i = -512; i < 900; i += 52) {
             ctx.beginPath();
             ctx.moveTo(i, 0);
@@ -1085,8 +1220,8 @@ function createWaterMaterial() {
     return new THREE.ShaderMaterial({
         uniforms: {
             uTime: { value: 0 },
-            uColorA: { value: new THREE.Color(0x1f55c7) },
-            uColorB: { value: new THREE.Color(0x6ee7ff) },
+            uColorA: { value: new THREE.Color(0x064fae) },
+            uColorB: { value: new THREE.Color(0x17b9d6) },
         },
         vertexShader: `
       uniform float uTime;
@@ -1111,8 +1246,8 @@ function createWaterMaterial() {
         float stripes = smoothstep(0.96, 1.0, sin((vUv.y + vUv.x * 0.22) * 78.0 - uTime * 2.6));
         float glint = smoothstep(0.74, 1.0, sin(vUv.x * 18.0 + uTime) * sin(vUv.y * 26.0 - uTime * 0.7));
         vec3 color = mix(uColorA, uColorB, vUv.x * 0.72 + 0.18 + vWave * 0.4);
-        color += vec3(0.42, 0.72, 0.86) * stripes * 0.38;
-        color += vec3(1.0, 0.96, 0.72) * glint * 0.13;
+        color += vec3(0.28, 0.62, 0.78) * stripes * 0.26;
+        color += vec3(0.96, 0.9, 0.54) * glint * 0.09;
         gl_FragColor = vec4(color, 1.0);
       }
     `,
