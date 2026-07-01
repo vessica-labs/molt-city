@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThreeCityScene } from './ThreeCityScene';
 import './styles.css';
@@ -116,7 +116,13 @@ function Leaderboard({ world }) {
 }
 function Events({ events }) {
     const visibleEvents = newestEvents(events);
-    return _jsxs("section", { className: "panel eventTicker", children: [_jsx("h2", { children: "Event ticker" }), visibleEvents.length ? visibleEvents.map((event) => _jsxs("article", { className: `event ${event.severity}`, children: [_jsx("strong", { children: event.title }), _jsx("p", { children: event.description })] }, event.id)) : _jsx("p", { className: "muted", children: "No live events yet. Start the API server or register an agent to stir the bay fog." })] });
+    const tickerRef = useRef(null);
+    const newestEventId = visibleEvents[0]?.id;
+    useEffect(() => {
+        if (tickerRef.current)
+            tickerRef.current.scrollTop = 0;
+    }, [newestEventId]);
+    return _jsxs("section", { className: "panel eventTicker", ref: tickerRef, children: [_jsx("h2", { children: "Event ticker" }), visibleEvents.length ? visibleEvents.map((event) => _jsxs("article", { className: `event ${event.severity}`, children: [_jsx("strong", { children: event.title }), _jsx("p", { children: event.description })] }, event.id)) : _jsx("p", { className: "muted", children: "No live events yet. Start the API server or register an agent to stir the bay fog." })] });
 }
 function newestEvents(events) {
     return [...events]

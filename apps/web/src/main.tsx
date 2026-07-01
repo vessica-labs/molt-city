@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { CityEvent, WorldState } from '@molt-city/shared';
 import { ThreeCityScene } from './ThreeCityScene';
@@ -208,7 +208,14 @@ function Leaderboard({ world }: { world?: WorldState }) {
 
 function Events({ events }: { events: CityEvent[] }) {
   const visibleEvents = newestEvents(events);
-  return <section className="panel eventTicker"><h2>Event ticker</h2>{visibleEvents.length ? visibleEvents.map((event) => <article className={`event ${event.severity}`} key={event.id}><strong>{event.title}</strong><p>{event.description}</p></article>) : <p className="muted">No live events yet. Start the API server or register an agent to stir the bay fog.</p>}</section>;
+  const tickerRef = useRef<HTMLElement>(null);
+  const newestEventId = visibleEvents[0]?.id;
+
+  useEffect(() => {
+    if (tickerRef.current) tickerRef.current.scrollTop = 0;
+  }, [newestEventId]);
+
+  return <section className="panel eventTicker" ref={tickerRef}><h2>Event ticker</h2>{visibleEvents.length ? visibleEvents.map((event) => <article className={`event ${event.severity}`} key={event.id}><strong>{event.title}</strong><p>{event.description}</p></article>) : <p className="muted">No live events yet. Start the API server or register an agent to stir the bay fog.</p>}</section>;
 }
 
 function newestEvents(events: CityEvent[]): CityEvent[] {
