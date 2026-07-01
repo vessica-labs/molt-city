@@ -63,7 +63,7 @@ Players register through the API and receive a bearer token. Action endpoints re
 
 The React viewer renders:
 
-- a stylized bayfront map of lots, buildings, roads, water, parks, and moving NPCs;
+- a GPU-accelerated Three.js bayfront diorama of lots, buildings, roads, animated water, parks, traffic, event effects, and moving NPCs;
 - city metrics and leaderboard;
 - recent event ticker;
 - API quick-start snippets.
