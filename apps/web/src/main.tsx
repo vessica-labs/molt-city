@@ -6,6 +6,7 @@ import './styles.css';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
 const MAX_HISTORY_POINTS = 90;
+const EVENT_TICKER_LIMIT = 10;
 const GAZILLIONAIRE_NET_WORTH = 1_000_000;
 const TIMELINE_START_LABEL = 'November 30, 2022';
 
@@ -58,13 +59,13 @@ function App() {
     const source = new EventSource(`${apiBase}/api/v1/stream`);
     source.addEventListener('city', (message) => {
       const event = JSON.parse((message as MessageEvent).data) as CityEvent;
-      setStreamEvents((events) => [event, ...events].slice(0, 8));
+      setStreamEvents((events) => [event, ...events].slice(0, EVENT_TICKER_LIMIT));
     });
     source.onerror = () => source.close();
     return () => source.close();
   }, []);
 
-  const events = streamEvents.length ? streamEvents : world?.events.slice(0, 8) ?? [];
+  const events = streamEvents.length ? streamEvents : world?.events.slice(0, EVENT_TICKER_LIMIT) ?? [];
 
   async function resetTimeline() {
     setIsResetting(true);
@@ -104,16 +105,18 @@ function App() {
         <aside className="sidePanel">
           <Metrics world={world} />
           <Leaderboard world={world} />
-          <Events events={events} />
           <ApiSnippet />
         </aside>
       </section>
 
-      <section className="analyticsDeck" aria-label="City analytics over time">
-        <CityPulseCharts history={history} world={world} />
-        <WealthChart history={history} world={world} />
-        <GazillionaireGallery world={world} />
-        <CatPanel world={world} />
+      <section className="belowDiorama" aria-label="City activity and analytics">
+        <Events events={events} />
+        <div className="analyticsDeck" aria-label="City analytics over time">
+          <CityPulseCharts history={history} world={world} />
+          <WealthChart history={history} world={world} />
+          <GazillionaireGallery world={world} />
+          <CatPanel world={world} />
+        </div>
       </section>
     </main>
   );
@@ -204,7 +207,8 @@ function Leaderboard({ world }: { world?: WorldState }) {
 }
 
 function Events({ events }: { events: CityEvent[] }) {
-  return <section className="panel"><h2>Event ticker</h2>{events.length ? events.map((event) => <article className={`event ${event.severity}`} key={event.id}><strong>{event.title}</strong><p>{event.description}</p></article>) : <p className="muted">No live events yet. Start the API server or register an agent to stir the bay fog.</p>}</section>;
+  const visibleEvents = events.slice(0, EVENT_TICKER_LIMIT);
+  return <section className="panel eventTicker"><h2>Event ticker</h2>{visibleEvents.length ? visibleEvents.map((event) => <article className={`event ${event.severity}`} key={event.id}><strong>{event.title}</strong><p>{event.description}</p></article>) : <p className="muted">No live events yet. Start the API server or register an agent to stir the bay fog.</p>}</section>;
 }
 
 function CityPulseCharts({ history, world }: { history: HistoryPoint[]; world?: WorldState }) {

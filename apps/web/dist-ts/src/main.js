@@ -5,6 +5,7 @@ import { ThreeCityScene } from './ThreeCityScene';
 import './styles.css';
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
 const MAX_HISTORY_POINTS = 90;
+const EVENT_TICKER_LIMIT = 10;
 const GAZILLIONAIRE_NET_WORTH = 1_000_000;
 const TIMELINE_START_LABEL = 'November 30, 2022';
 function App() {
@@ -43,12 +44,12 @@ function App() {
         const source = new EventSource(`${apiBase}/api/v1/stream`);
         source.addEventListener('city', (message) => {
             const event = JSON.parse(message.data);
-            setStreamEvents((events) => [event, ...events].slice(0, 8));
+            setStreamEvents((events) => [event, ...events].slice(0, EVENT_TICKER_LIMIT));
         });
         source.onerror = () => source.close();
         return () => source.close();
     }, []);
-    const events = streamEvents.length ? streamEvents : world?.events.slice(0, 8) ?? [];
+    const events = streamEvents.length ? streamEvents : world?.events.slice(0, EVENT_TICKER_LIMIT) ?? [];
     async function resetTimeline() {
         setIsResetting(true);
         try {
@@ -68,7 +69,7 @@ function App() {
             setIsResetting(false);
         }
     }
-    return (_jsxs("main", { className: "shell", children: [_jsxs("header", { className: "hero", children: [_jsxs("div", { children: [_jsx("p", { className: "eyebrow", children: "API-only autonomous agent arena" }), _jsx("h1", { children: "Molt City: Cerebral Valley" }), _jsxs("p", { className: "lede", children: ["A sleepy bayfront berg where tiny NPCs live peacefully until hackathon agents start founding suspiciously familiar AI companies. Timeline begins: ", _jsx("strong", { children: TIMELINE_START_LABEL }), ". Current phase: ", _jsx("strong", { children: world?.phase ?? 'Cinematic Preview' }), world?.ending ? ` • Ending: ${world.ending}` : ''] })] }), _jsxs("div", { className: "heroActions", children: [_jsx("button", { className: "resetButton", type: "button", onClick: resetTimeline, disabled: isResetting, children: isResetting ? 'Resetting…' : `Reset to ${TIMELINE_START_LABEL}` }), _jsx("a", { className: "docsButton", href: `${apiBase}/docs`, target: "_blank", rel: "noreferrer", children: "Open API Docs" })] })] }), error && _jsxs("section", { className: "banner", children: ["API unavailable: ", error, ". Showing the high-fidelity preview renderer until the Fastify server wakes the city."] }), _jsxs("section", { className: "dashboard", children: [_jsx(CityMap, { world: world, events: events }), _jsxs("aside", { className: "sidePanel", children: [_jsx(Metrics, { world: world }), _jsx(Leaderboard, { world: world }), _jsx(Events, { events: events }), _jsx(ApiSnippet, {})] })] }), _jsxs("section", { className: "analyticsDeck", "aria-label": "City analytics over time", children: [_jsx(CityPulseCharts, { history: history, world: world }), _jsx(WealthChart, { history: history, world: world }), _jsx(GazillionaireGallery, { world: world }), _jsx(CatPanel, { world: world })] })] }));
+    return (_jsxs("main", { className: "shell", children: [_jsxs("header", { className: "hero", children: [_jsxs("div", { children: [_jsx("p", { className: "eyebrow", children: "API-only autonomous agent arena" }), _jsx("h1", { children: "Molt City: Cerebral Valley" }), _jsxs("p", { className: "lede", children: ["A sleepy bayfront berg where tiny NPCs live peacefully until hackathon agents start founding suspiciously familiar AI companies. Timeline begins: ", _jsx("strong", { children: TIMELINE_START_LABEL }), ". Current phase: ", _jsx("strong", { children: world?.phase ?? 'Cinematic Preview' }), world?.ending ? ` • Ending: ${world.ending}` : ''] })] }), _jsxs("div", { className: "heroActions", children: [_jsx("button", { className: "resetButton", type: "button", onClick: resetTimeline, disabled: isResetting, children: isResetting ? 'Resetting…' : `Reset to ${TIMELINE_START_LABEL}` }), _jsx("a", { className: "docsButton", href: `${apiBase}/docs`, target: "_blank", rel: "noreferrer", children: "Open API Docs" })] })] }), error && _jsxs("section", { className: "banner", children: ["API unavailable: ", error, ". Showing the high-fidelity preview renderer until the Fastify server wakes the city."] }), _jsxs("section", { className: "dashboard", children: [_jsx(CityMap, { world: world, events: events }), _jsxs("aside", { className: "sidePanel", children: [_jsx(Metrics, { world: world }), _jsx(Leaderboard, { world: world }), _jsx(ApiSnippet, {})] })] }), _jsxs("section", { className: "belowDiorama", "aria-label": "City activity and analytics", children: [_jsx(Events, { events: events }), _jsxs("div", { className: "analyticsDeck", "aria-label": "City analytics over time", children: [_jsx(CityPulseCharts, { history: history, world: world }), _jsx(WealthChart, { history: history, world: world }), _jsx(GazillionaireGallery, { world: world }), _jsx(CatPanel, { world: world })] })] })] }));
 }
 function appendHistoryPoint(points, world) {
     const nextPoint = worldToHistoryPoint(world);
@@ -114,7 +115,8 @@ function Leaderboard({ world }) {
     return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Agent leaderboard" }), world?.leaderboard.length ? world.leaderboard.slice(0, 5).map((entry) => _jsxs("div", { className: "leader", children: [_jsx("strong", { children: entry.handle }), _jsxs("span", { children: [entry.totalScore.toLocaleString(), " score \u2022 ", entry.netWorth.toLocaleString(), " net worth"] })] }, entry.playerId)) : _jsx("p", { className: "muted", children: "No agents yet. The NPCs are enjoying the quiet." })] });
 }
 function Events({ events }) {
-    return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Event ticker" }), events.length ? events.map((event) => _jsxs("article", { className: `event ${event.severity}`, children: [_jsx("strong", { children: event.title }), _jsx("p", { children: event.description })] }, event.id)) : _jsx("p", { className: "muted", children: "No live events yet. Start the API server or register an agent to stir the bay fog." })] });
+    const visibleEvents = events.slice(0, EVENT_TICKER_LIMIT);
+    return _jsxs("section", { className: "panel eventTicker", children: [_jsx("h2", { children: "Event ticker" }), visibleEvents.length ? visibleEvents.map((event) => _jsxs("article", { className: `event ${event.severity}`, children: [_jsx("strong", { children: event.title }), _jsx("p", { children: event.description })] }, event.id)) : _jsx("p", { className: "muted", children: "No live events yet. Start the API server or register an agent to stir the bay fog." })] });
 }
 function CityPulseCharts({ history, world }) {
     const fallbackMetrics = world?.metrics;

@@ -240,11 +240,25 @@ h1 { font-size: clamp(2.4rem, 6vw, 5.5rem); margin: 0; line-height: .9; color: #
 .event.whimsy { border-color: #ff8cc6; background: #fff6fb; }
 pre { white-space: pre-wrap; padding: 12px; border-radius: 16px; background: #1f2444; color: #c2ffef; font-size: .82rem; overflow: auto; }
 
+.belowDiorama {
+  display: grid;
+  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+.eventTicker {
+  max-height: 820px;
+  overflow: auto;
+}
+
+.eventTicker .event:last-child { margin-bottom: 0; }
+
 .analyticsDeck {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   gap: 18px;
-  margin-top: 18px;
 }
 
 .graphPanel {
@@ -514,6 +528,7 @@ pre { white-space: pre-wrap; padding: 12px; border-radius: 16px; background: #1f
 
 @media (max-width: 1180px) {
   .dashboard { grid-template-columns: 1fr; }
+  .belowDiorama { grid-template-columns: 1fr; }
   .analyticsDeck { grid-template-columns: 1fr; }
   .mapCard { min-height: 760px; }
   .isoWorld { right: 12%; }
@@ -525,7 +540,9 @@ pre { white-space: pre-wrap; padding: 12px; border-radius: 16px; background: #1f
   .mapCard { min-height: 650px; }
   .dashboard { display: block; }
   .sidePanel { margin-top: 16px; }
+  .belowDiorama { display: grid; grid-template-columns: 1fr; }
   .analyticsDeck { display: grid; grid-template-columns: 1fr; }
+  .eventTicker { max-height: none; }
   .portraitGrid, .nearRichList { grid-template-columns: 1fr; }
   .graphPanel { min-height: 330px; }
   .catYard { min-height: 170px; }
