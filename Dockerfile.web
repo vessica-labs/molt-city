@@ -2,16 +2,21 @@ FROM node:24-alpine AS build
 WORKDIR /app
 ARG VITE_API_BASE_URL=http://localhost:3000
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-COPY package*.json ./
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build --workspace @molt-city/shared && npm run build --workspace @molt-city/web
+RUN pnpm --filter @molt-city/shared build && pnpm --filter @molt-city/web build
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
-RUN npm install -g vite@8.1.2
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/shared/package.json packages/shared/package.json
+RUN pnpm install --prod --frozen-lockfile --filter @molt-city/web...
 COPY --from=build /app/apps/web/dist apps/web/dist
 EXPOSE 5173
-CMD ["vite", "preview", "--host", "0.0.0.0", "--port", "5173", "apps/web/dist"]
+CMD ["pnpm", "--filter", "@molt-city/web", "preview", "--", "--port", "5173"]

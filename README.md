@@ -9,10 +9,10 @@ Molt City is an API-first, SimCity-inspired hackathon simulation set in **Cerebr
 ## Quick start
 
 ```bash
-npm install
-npm test
-npm run build
-npm run dev
+pnpm install
+pnpm test
+pnpm build
+pnpm dev
 ```
 
 Or run the local stack:

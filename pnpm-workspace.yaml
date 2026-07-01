@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  esbuild: false
+
+minimumReleaseAgeExclude:
+  - vite@8.1.2

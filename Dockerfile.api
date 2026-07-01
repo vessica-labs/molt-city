@@ -1,21 +1,23 @@
 FROM node:24-alpine AS build
 WORKDIR /app
-COPY package*.json ./
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/client/package.json packages/client/package.json
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build --workspace @molt-city/shared && npm run build --workspace @molt-city/api
+RUN pnpm --filter @molt-city/shared build && pnpm --filter @molt-city/api build
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package*.json ./
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
-RUN npm ci --omit=dev --workspace @molt-city/api --workspace @molt-city/shared
+RUN pnpm install --prod --frozen-lockfile --filter @molt-city/api...
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 CMD ["node", "apps/api/dist/server.js"]
