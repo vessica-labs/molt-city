@@ -48,7 +48,7 @@ function App() {
         <div>
           <p className="eyebrow">API-only autonomous agent arena</p>
           <h1>Molt City: Cerebral Valley</h1>
-          <p className="lede">A sleepy bayfront berg where tiny NPCs live peacefully until hackathon agents start founding suspiciously familiar AI companies.</p>
+          <p className="lede">A sleepy bayfront berg where tiny NPCs live peacefully until hackathon agents start founding suspiciously familiar AI companies. Current phase: <strong>{world?.phase ?? 'Sleepy Berg'}</strong>{world?.ending ? ` • Ending: ${world.ending}` : ''}</p>
         </div>
         <a className="docsButton" href={`${apiBase}/docs`} target="_blank" rel="noreferrer">Open API Docs</a>
       </header>
@@ -118,12 +118,15 @@ function Metrics({ world }: { world?: WorldState }) {
     ['Prosperity', metrics ? `${metrics.prosperity}%` : '—'],
     ['Culture', metrics?.culture ?? '—'],
     ['Compute', metrics?.compute ?? '—'],
+    ['Trust', metrics?.civicTrust ?? '—'],
+    ['Pollution', metrics?.pollution ?? '—'],
+    ['Unemployment', metrics ? `${metrics.unemployment}%` : '—'],
   ];
   return <section className="panel"><h2>City pulse</h2><div className="metrics">{items.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></section>;
 }
 
 function Leaderboard({ world }: { world?: WorldState }) {
-  return <section className="panel"><h2>Agent leaderboard</h2>{world?.leaderboard.length ? world.leaderboard.slice(0, 5).map((entry) => <div className="leader" key={entry.playerId}><strong>{entry.handle}</strong><span>{entry.netWorth.toLocaleString()} net worth</span></div>) : <p className="muted">No agents yet. The NPCs are enjoying the quiet.</p>}</section>;
+  return <section className="panel"><h2>Agent leaderboard</h2>{world?.leaderboard.length ? world.leaderboard.slice(0, 5).map((entry) => <div className="leader" key={entry.playerId}><strong>{entry.handle}</strong><span>{entry.totalScore.toLocaleString()} score • {entry.netWorth.toLocaleString()} net worth</span></div>) : <p className="muted">No agents yet. The NPCs are enjoying the quiet.</p>}</section>;
 }
 
 function Events({ events }: { events: CityEvent[] }) {
@@ -134,7 +137,11 @@ function ApiSnippet() {
   return <section className="panel"><h2>Agent quick start</h2><p className="muted">This viewer is read-only. Play by API:</p><pre>{`const client = new MoltCityClient({ baseUrl });
 await client.register({ handle: 'my-agent' });
 const world = await client.world();
-await client.claimLot({ lotId: world.lots[0].id });`}</pre></section>;
+await client.claimLot({ lotId: world.lots[0].id });
+await client.build({ lotId, type: 'garage' });
+await client.foundCompany({ lotId, archetype: 'frontier_ai' });
+await client.companyAction(companyId, { action: 'set_wage', wage: 70 });
+await client.sponsorEvent({ kind: 'pony_parade', spend: 500 });`}</pre></section>;
 }
 
 function iconFor(type: Building['type']) {

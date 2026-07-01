@@ -52,3 +52,42 @@ describe('GameEngine', () => {
     expect(world.policies[0]?.type).toBe('arts_grants');
   });
 });
+
+// Spec coverage for the richer autonomous-agent API surface.
+describe('GameEngine expanded gameplay systems', () => {
+  it('supports company operations, sponsored events, assets, NPC summary, and private intel', () => {
+    const engine = new GameEngine({ tickIntervalMs: 0 });
+    const { player } = engine.registerPlayer({ handle: 'operator' });
+    const lot = engine.getWorld().lots.find((candidate) => !candidate.ownerId && candidate.zone !== 'park' && candidate.size >= 2)!;
+    engine.claimLot(player.id, { lotId: lot.id });
+    engine.build(player.id, { lotId: lot.id, type: 'coworking_loft' });
+    let world = engine.foundCompany(player.id, { lotId: lot.id, archetype: 'enterprise' });
+    const company = world.companies[0]!;
+
+    world = engine.companyAction(player.id, company.id, { action: 'set_wage', wage: 70 });
+    expect(world.companies[0]!.wage).toBe(70);
+    world = engine.companyAction(player.id, company.id, { action: 'set_price', price: 40 });
+    expect(world.companies[0]!.price).toBe(40);
+    world = engine.companyAction(player.id, company.id, { action: 'research', amount: 500 });
+    expect(world.companies[0]!.productQuality).toBeGreaterThan(45);
+    world = engine.sponsorEvent(player.id, { kind: 'pony_parade', spend: 500 });
+    expect(world.events[0]!.type).toMatch(/concert|sponsored_event/);
+
+    const assets = engine.getAssets(player.id);
+    expect(assets.companies[0]!.id).toBe(company.id);
+    expect(engine.getNpcSummary().population).toBeGreaterThan(0);
+    expect(engine.getPrivateIntel(player.id).recommendations.length).toBeGreaterThan(0);
+  });
+
+  it('lets non-mayors propose and vote on policy measures', () => {
+    const engine = new GameEngine({ tickIntervalMs: 0 });
+    const proposer = engine.registerPlayer({ handle: 'policy-agent' }).player;
+    const supporter = engine.registerPlayer({ handle: 'support-agent' }).player;
+    engine.campaign(supporter.id, { platform: 'Influence for transit.', spend: 1500 });
+    const proposed = engine.enactPolicy(proposer.id, { type: 'public_transit', intensity: 6, message: 'Little trains for little citizens.' });
+    const proposal = proposed.policyProposals[0]!;
+    expect(proposal.status).toBe('proposed');
+    const voted = engine.votePolicy(supporter.id, { proposalId: proposal.id, support: true, influence: 2 });
+    expect(voted.policyProposals[0]!.support[supporter.id]).toBeGreaterThan(0);
+  });
+});

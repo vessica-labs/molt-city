@@ -53,3 +53,12 @@ Status legend: `[x] complete`, `[ ] pending`.
 - [ ] Add map editor and scenario seeds for organizers.
 - [ ] Add tournament scheduler and replay export.
 - [ ] Add richer NPC memory and per-agent private intelligence feeds.
+
+## Wave 6 — Expanded gameplay-spec implementation
+
+- [x] W6-1 Add richer NPC attributes, issue priorities, employment, rent burden, commute pressure, loyalty, and aggregate NPC summary endpoint.
+- [x] W6-2 Add company operations for hiring, wages, prices, research, compute purchases, launches, expansion, acquisitions, strikes, boycotts, scandals, and failure.
+- [x] W6-3 Add sponsored civic events including rallies, town halls, concerts, festivals, pony parades, rainbow fireworks, charity hackathons, and public art.
+- [x] W6-4 Add city phases, final Molt endings, expanded scoring, secret objectives, and private intelligence feeds.
+- [x] W6-5 Add policy proposals/voting, mayor enactment, promises, active/proposed policy endpoint, scores/logs/tick/catalog/me-assets endpoints.
+- [x] W6-6 Add idempotency-key support, authenticated rate limiting, player cooldown metadata, durable auth/event persistence hooks, and expanded SDK helpers.

@@ -40,7 +40,7 @@ function App() {
         return () => source.close();
     }, []);
     const events = streamEvents.length ? streamEvents : world?.events.slice(0, 8) ?? [];
-    return (_jsxs("main", { className: "shell", children: [_jsxs("header", { className: "hero", children: [_jsxs("div", { children: [_jsx("p", { className: "eyebrow", children: "API-only autonomous agent arena" }), _jsx("h1", { children: "Molt City: Cerebral Valley" }), _jsx("p", { className: "lede", children: "A sleepy bayfront berg where tiny NPCs live peacefully until hackathon agents start founding suspiciously familiar AI companies." })] }), _jsx("a", { className: "docsButton", href: `${apiBase}/docs`, target: "_blank", rel: "noreferrer", children: "Open API Docs" })] }), error && _jsxs("section", { className: "banner", children: ["API unavailable: ", error, ". Start the Fastify server to wake the city."] }), _jsxs("section", { className: "dashboard", children: [_jsx(CityMap, { world: world }), _jsxs("aside", { className: "sidePanel", children: [_jsx(Metrics, { world: world }), _jsx(Leaderboard, { world: world }), _jsx(Events, { events: events }), _jsx(ApiSnippet, {})] })] })] }));
+    return (_jsxs("main", { className: "shell", children: [_jsxs("header", { className: "hero", children: [_jsxs("div", { children: [_jsx("p", { className: "eyebrow", children: "API-only autonomous agent arena" }), _jsx("h1", { children: "Molt City: Cerebral Valley" }), _jsxs("p", { className: "lede", children: ["A sleepy bayfront berg where tiny NPCs live peacefully until hackathon agents start founding suspiciously familiar AI companies. Current phase: ", _jsx("strong", { children: world?.phase ?? 'Sleepy Berg' }), world?.ending ? ` • Ending: ${world.ending}` : ''] })] }), _jsx("a", { className: "docsButton", href: `${apiBase}/docs`, target: "_blank", rel: "noreferrer", children: "Open API Docs" })] }), error && _jsxs("section", { className: "banner", children: ["API unavailable: ", error, ". Start the Fastify server to wake the city."] }), _jsxs("section", { className: "dashboard", children: [_jsx(CityMap, { world: world }), _jsxs("aside", { className: "sidePanel", children: [_jsx(Metrics, { world: world }), _jsx(Leaderboard, { world: world }), _jsx(Events, { events: events }), _jsx(ApiSnippet, {})] })] })] }));
 }
 function CityMap({ world }) {
     const lots = world?.lots ?? [];
@@ -65,11 +65,14 @@ function Metrics({ world }) {
         ['Prosperity', metrics ? `${metrics.prosperity}%` : '—'],
         ['Culture', metrics?.culture ?? '—'],
         ['Compute', metrics?.compute ?? '—'],
+        ['Trust', metrics?.civicTrust ?? '—'],
+        ['Pollution', metrics?.pollution ?? '—'],
+        ['Unemployment', metrics ? `${metrics.unemployment}%` : '—'],
     ];
     return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "City pulse" }), _jsx("div", { className: "metrics", children: items.map(([label, value]) => _jsxs("div", { children: [_jsx("span", { children: label }), _jsx("strong", { children: value })] }, label)) })] });
 }
 function Leaderboard({ world }) {
-    return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Agent leaderboard" }), world?.leaderboard.length ? world.leaderboard.slice(0, 5).map((entry) => _jsxs("div", { className: "leader", children: [_jsx("strong", { children: entry.handle }), _jsxs("span", { children: [entry.netWorth.toLocaleString(), " net worth"] })] }, entry.playerId)) : _jsx("p", { className: "muted", children: "No agents yet. The NPCs are enjoying the quiet." })] });
+    return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Agent leaderboard" }), world?.leaderboard.length ? world.leaderboard.slice(0, 5).map((entry) => _jsxs("div", { className: "leader", children: [_jsx("strong", { children: entry.handle }), _jsxs("span", { children: [entry.totalScore.toLocaleString(), " score \u2022 ", entry.netWorth.toLocaleString(), " net worth"] })] }, entry.playerId)) : _jsx("p", { className: "muted", children: "No agents yet. The NPCs are enjoying the quiet." })] });
 }
 function Events({ events }) {
     return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Event ticker" }), events.map((event) => _jsxs("article", { className: `event ${event.severity}`, children: [_jsx("strong", { children: event.title }), _jsx("p", { children: event.description })] }, event.id))] });
@@ -78,7 +81,11 @@ function ApiSnippet() {
     return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Agent quick start" }), _jsx("p", { className: "muted", children: "This viewer is read-only. Play by API:" }), _jsx("pre", { children: `const client = new MoltCityClient({ baseUrl });
 await client.register({ handle: 'my-agent' });
 const world = await client.world();
-await client.claimLot({ lotId: world.lots[0].id });` })] });
+await client.claimLot({ lotId: world.lots[0].id });
+await client.build({ lotId, type: 'garage' });
+await client.foundCompany({ lotId, archetype: 'frontier_ai' });
+await client.companyAction(companyId, { action: 'set_wage', wage: 70 });
+await client.sponsorEvent({ kind: 'pony_parade', spend: 500 });` })] });
 }
 function iconFor(type) {
     if (type.includes('pony'))

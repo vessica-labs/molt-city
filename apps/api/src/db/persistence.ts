@@ -1,12 +1,18 @@
+import { createHash } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { desc } from 'drizzle-orm';
 import postgres from 'postgres';
-import type { WorldState } from '@molt-city/shared';
+import type { CityEvent, Player, WorldState } from '@molt-city/shared';
 import { gameSnapshots } from './schema.js';
+
+export type PersistedTokenRecord = { tokenHash: string; playerId: string; createdAt: string };
 
 export interface PersistenceAdapter {
   loadLatest(): Promise<WorldState | undefined>;
+  loadTokens(): Promise<PersistedTokenRecord[]>;
   save(world: WorldState): Promise<void>;
+  saveAuth(player: Player, tokenHash: string, label: string): Promise<void>;
+  saveEvent(event: CityEvent): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -15,7 +21,19 @@ export class NoopPersistence implements PersistenceAdapter {
     return undefined;
   }
 
+  async loadTokens(): Promise<PersistedTokenRecord[]> {
+    return [];
+  }
+
   async save(_world: WorldState): Promise<void> {
+    return undefined;
+  }
+
+  async saveAuth(_player: Player, _tokenHash: string, _label: string): Promise<void> {
+    return undefined;
+  }
+
+  async saveEvent(_event: CityEvent): Promise<void> {
     return undefined;
   }
 
@@ -41,6 +59,14 @@ export class PostgresSnapshotPersistence implements PersistenceAdapter {
     return rows[0]?.state as WorldState | undefined;
   }
 
+  async loadTokens(): Promise<PersistedTokenRecord[]> {
+    await this.ready;
+    const rows = await this.sql<{ token_hash: string; player_id: string; created_at: Date }[]>`
+      SELECT token_hash, player_id, created_at FROM api_keys
+    `;
+    return rows.map((row) => ({ tokenHash: row.token_hash, playerId: row.player_id, createdAt: row.created_at.toISOString() }));
+  }
+
   async save(world: WorldState): Promise<void> {
     await this.ready;
     await this.db.insert(gameSnapshots).values({
@@ -48,6 +74,35 @@ export class PostgresSnapshotPersistence implements PersistenceAdapter {
       tick: world.metrics.tick,
       state: world,
     });
+  }
+
+  async saveAuth(player: Player, tokenHash: string, label: string): Promise<void> {
+    await this.ready;
+    await this.sql`
+      INSERT INTO players (id, handle, agent_name, capital, reputation, influence, civic_trust)
+      VALUES (${player.id}, ${player.handle}, ${player.agentName}, ${player.capital}, ${player.reputation}, ${player.influence}, ${player.civicTrust})
+      ON CONFLICT (id) DO UPDATE SET
+        handle = excluded.handle,
+        agent_name = excluded.agent_name,
+        capital = excluded.capital,
+        reputation = excluded.reputation,
+        influence = excluded.influence,
+        civic_trust = excluded.civic_trust
+    `;
+    await this.sql`
+      INSERT INTO api_keys (token_hash, player_id, label)
+      VALUES (${tokenHash}, ${player.id}, ${label})
+      ON CONFLICT (token_hash) DO NOTHING
+    `;
+  }
+
+  async saveEvent(event: CityEvent): Promise<void> {
+    await this.ready;
+    await this.sql`
+      INSERT INTO events (id, tick, type, title, description, severity, payload)
+      VALUES (${event.id}, ${event.tick}, ${event.type}, ${event.title}, ${event.description}, ${event.severity}, ${JSON.stringify(event.payload ?? {})}::jsonb)
+      ON CONFLICT (id) DO NOTHING
+    `;
   }
 
   async close(): Promise<void> {
@@ -102,4 +157,8 @@ export class PostgresSnapshotPersistence implements PersistenceAdapter {
 
 export function createPersistence(databaseUrl?: string): PersistenceAdapter {
   return databaseUrl ? new PostgresSnapshotPersistence(databaseUrl) : new NoopPersistence();
+}
+
+export function hashTokenForPersistence(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
