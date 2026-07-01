@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "pnpm --filter @molt-city/api start",
+    "startCommand": "sh -c 'case \"$RAILWAY_SERVICE_NAME\" in web) pnpm --filter @molt-city/web start ;; simulator|sim) pnpm --filter @molt-city/simulator start ;; *) pnpm --filter @molt-city/api start ;; esac'",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }

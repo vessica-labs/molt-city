@@ -4,7 +4,10 @@
   "private": true,
   "description": "API-first SimCity-like hackathon simulation in Cerebral Valley.",
   "type": "module",
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter @molt-city/api --filter @molt-city/web dev",
     "dev:api": "pnpm --filter @molt-city/api dev",

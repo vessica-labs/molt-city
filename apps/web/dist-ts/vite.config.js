@@ -4,11 +4,14 @@ export default defineConfig({
     plugins: [react()],
     server: {
         port: 5173,
-        allowedHosts: ['.tunnel.runloop.ai'],
+        allowedHosts: ['.railway.app', '.tunnel.runloop.ai'],
         proxy: {
             '/api': 'http://localhost:3000',
             '/docs': 'http://localhost:3000',
             '/health': 'http://localhost:3000',
         },
+    },
+    preview: {
+        allowedHosts: ['.railway.app', '.tunnel.runloop.ai'],
     },
 });
