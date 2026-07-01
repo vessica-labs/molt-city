@@ -65,7 +65,7 @@ function App() {
     return () => source.close();
   }, []);
 
-  const events = streamEvents.length ? streamEvents : world?.events.slice(0, EVENT_TICKER_LIMIT) ?? [];
+  const events = newestEvents(streamEvents.length ? streamEvents : world?.events ?? []);
 
   async function resetTimeline() {
     setIsResetting(true);
@@ -207,8 +207,17 @@ function Leaderboard({ world }: { world?: WorldState }) {
 }
 
 function Events({ events }: { events: CityEvent[] }) {
-  const visibleEvents = events.slice(0, EVENT_TICKER_LIMIT);
+  const visibleEvents = newestEvents(events);
   return <section className="panel eventTicker"><h2>Event ticker</h2>{visibleEvents.length ? visibleEvents.map((event) => <article className={`event ${event.severity}`} key={event.id}><strong>{event.title}</strong><p>{event.description}</p></article>) : <p className="muted">No live events yet. Start the API server or register an agent to stir the bay fog.</p>}</section>;
+}
+
+function newestEvents(events: CityEvent[]): CityEvent[] {
+  return [...events]
+    .sort((a, b) => {
+      if (b.tick !== a.tick) return b.tick - a.tick;
+      return new Date(b.createdAt).valueOf() - new Date(a.createdAt).valueOf();
+    })
+    .slice(0, EVENT_TICKER_LIMIT);
 }
 
 function CityPulseCharts({ history, world }: { history: HistoryPoint[]; world?: WorldState }) {

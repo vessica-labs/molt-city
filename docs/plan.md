@@ -30,7 +30,7 @@ Status legend: `[x] complete`, `[ ] pending`.
 - [x] W3-5 Test and implement investing, campaign spending, elections, and mayor policy.
 - [x] W3-6 Test and implement NPC ticks, business patronage, happiness, protests, riots, and rainbow pony concerts.
 - [x] W3-7 Implement event history, SSE stream, and Redis fan-out fallback.
-- [x] W3-8 Implement optional OpenAI city narration hook.
+- [x] W3-8 Implement deterministic city narration summaries.
 - [x] W3-9 Publish Swagger/OpenAPI documentation at `/docs`.
 
 ## Wave 4 — Frontend spectator app

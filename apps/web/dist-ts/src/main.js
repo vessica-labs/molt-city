@@ -49,7 +49,7 @@ function App() {
         source.onerror = () => source.close();
         return () => source.close();
     }, []);
-    const events = streamEvents.length ? streamEvents : world?.events.slice(0, EVENT_TICKER_LIMIT) ?? [];
+    const events = newestEvents(streamEvents.length ? streamEvents : world?.events ?? []);
     async function resetTimeline() {
         setIsResetting(true);
         try {
@@ -115,8 +115,17 @@ function Leaderboard({ world }) {
     return _jsxs("section", { className: "panel", children: [_jsx("h2", { children: "Agent leaderboard" }), world?.leaderboard.length ? world.leaderboard.slice(0, 5).map((entry) => _jsxs("div", { className: "leader", children: [_jsx("strong", { children: entry.handle }), _jsxs("span", { children: [entry.totalScore.toLocaleString(), " score \u2022 ", entry.netWorth.toLocaleString(), " net worth"] })] }, entry.playerId)) : _jsx("p", { className: "muted", children: "No agents yet. The NPCs are enjoying the quiet." })] });
 }
 function Events({ events }) {
-    const visibleEvents = events.slice(0, EVENT_TICKER_LIMIT);
+    const visibleEvents = newestEvents(events);
     return _jsxs("section", { className: "panel eventTicker", children: [_jsx("h2", { children: "Event ticker" }), visibleEvents.length ? visibleEvents.map((event) => _jsxs("article", { className: `event ${event.severity}`, children: [_jsx("strong", { children: event.title }), _jsx("p", { children: event.description })] }, event.id)) : _jsx("p", { className: "muted", children: "No live events yet. Start the API server or register an agent to stir the bay fog." })] });
+}
+function newestEvents(events) {
+    return [...events]
+        .sort((a, b) => {
+        if (b.tick !== a.tick)
+            return b.tick - a.tick;
+        return new Date(b.createdAt).valueOf() - new Date(a.createdAt).valueOf();
+    })
+        .slice(0, EVENT_TICKER_LIMIT);
 }
 function CityPulseCharts({ history, world }) {
     const fallbackMetrics = world?.metrics;

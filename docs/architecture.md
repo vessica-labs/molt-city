@@ -33,7 +33,7 @@ read-only web viewer ---> GET world/events/docs/stream
 - `services/gameEngine.ts`: simulation tick loop and command handling.
 - `services/nameGenerator.ts`: playful company name generation.
 - `services/eventBus.ts`: publishes events to in-memory subscribers and Redis when configured.
-- `services/narrator.ts`: optional OpenAI-powered city bulletin generation when `OPENAI_API_KEY` is present.
+- `services/narrator.ts`: deterministic city bulletin summaries from recent events.
 - `db/schema.ts`: Drizzle PostgreSQL table definitions.
 - `db/persistence.ts`: snapshot load/save through Drizzle/Postgres with in-memory fallback.
 - `routes/*.ts`: API resources for auth, world, lots, companies, elections, actions, events, and streaming.
@@ -74,9 +74,9 @@ The frontend is a spectator surface only. It does not contain gameplay controls.
 
 `@molt-city/client` wraps fetch with typed helpers for registration, observation, building, founding companies, investing, campaigning, policy, and ticks. `scripts/smoke-client.ts` demonstrates how an external hackathon agent can control the application.
 
-## OpenAI hooks
+## Narration
 
-When `OPENAI_API_KEY` is configured, the API can generate short city bulletins from recent events. The simulation remains deterministic without LLM calls; LLM features are optional flavor and never required for tests.
+City bulletins are generated deterministically from recent events. The application does not call LLM providers.
 
 ## Local development
 
@@ -101,7 +101,6 @@ Required/typical environment variables:
 - `REDIS_URL`
 - `CORS_ORIGIN`
 - `SIM_ADMIN_TOKEN`
-- `OPENAI_API_KEY` (optional)
 - `PUBLIC_API_BASE_URL` / `VITE_API_BASE_URL`
 
 ## Testing strategy
