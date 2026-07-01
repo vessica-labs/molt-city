@@ -61,10 +61,10 @@ export class PostgresSnapshotPersistence implements PersistenceAdapter {
 
   async loadTokens(): Promise<PersistedTokenRecord[]> {
     await this.ready;
-    const rows = await this.sql<{ token_hash: string; player_id: string; created_at: Date }[]>`
+    const rows = await this.sql<{ token_hash: string; player_id: string; created_at: Date | string | number | null }[]>`
       SELECT token_hash, player_id, created_at FROM api_keys
     `;
-    return rows.map((row) => ({ tokenHash: row.token_hash, playerId: row.player_id, createdAt: row.created_at.toISOString() }));
+    return rows.map((row) => ({ tokenHash: row.token_hash, playerId: row.player_id, createdAt: toIsoTimestamp(row.created_at) }));
   }
 
   async save(world: WorldState): Promise<void> {
@@ -157,6 +157,15 @@ export class PostgresSnapshotPersistence implements PersistenceAdapter {
 
 export function createPersistence(databaseUrl?: string): PersistenceAdapter {
   return databaseUrl ? new PostgresSnapshotPersistence(databaseUrl) : new NoopPersistence();
+}
+
+function toIsoTimestamp(value: Date | string | number | null | undefined): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    if (!Number.isNaN(date.valueOf())) return date.toISOString();
+  }
+  return new Date().toISOString();
 }
 
 export function hashTokenForPersistence(token: string): string {
