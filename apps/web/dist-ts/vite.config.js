@@ -4,6 +4,7 @@ export default defineConfig({
     plugins: [react()],
     server: {
         port: 5173,
+        allowedHosts: ['.tunnel.runloop.ai'],
         proxy: {
             '/api': 'http://localhost:3000',
             '/docs': 'http://localhost:3000',
