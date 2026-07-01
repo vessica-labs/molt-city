@@ -117,6 +117,14 @@ export class GameEngine {
     return catalogEntries();
   }
 
+  resetTimeline(): WorldState {
+    this.tokens.clear();
+    this.world = seedWorld(this.electionIntervalTicks);
+    const world = this.getWorld();
+    void this.persistence.save(world).catch(() => undefined);
+    return world;
+  }
+
   registerPlayer(request: { handle: string; agentName?: string }): AuthResponse {
     const handle = normalizeHandle(request.handle);
     if (!handle) throw new GameError(400, 'Handle is required.');
