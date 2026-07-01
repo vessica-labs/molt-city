@@ -2,6 +2,8 @@ export type ID = string;
 
 export type Coordinates = { x: number; y: number };
 
+export type CooldownMap = Record<string, number>;
+
 export type Player = {
   id: ID;
   handle: string;
@@ -11,9 +13,15 @@ export type Player = {
   influence: number;
   civicTrust: number;
   createdAt: string;
+  cooldowns: CooldownMap;
+  offices: string[];
+  secretObjective?: string;
 };
 
 export type NpcMood = 'happy' | 'content' | 'sad' | 'upset' | 'rioting' | 'celebrating';
+
+export type NpcIssue = 'housing' | 'wages' | 'compute' | 'transit' | 'parks' | 'safety' | 'culture' | 'taxes';
+export type NpcSkill = 'service' | 'research' | 'operations' | 'civic' | 'creative' | 'hardware';
 
 export type Npc = {
   id: ID;
@@ -23,9 +31,18 @@ export type Npc = {
   patience: number;
   politics: 'growth' | 'harmony' | 'order' | 'chaos';
   money: number;
+  income: number;
+  savings: number;
+  energy: number;
+  rentBurden: number;
+  commuteMinutes: number;
+  skills: NpcSkill[];
+  issuePriorities: NpcIssue[];
+  loyalty: Record<ID, number>;
+  protestThreshold: number;
   homeLotId: ID;
   workCompanyId?: ID;
-  activity: 'home' | 'working' | 'shopping' | 'commuting' | 'protesting' | 'concert';
+  activity: 'home' | 'working' | 'shopping' | 'commuting' | 'protesting' | 'concert' | 'rally' | 'striking';
   mood: NpcMood;
   position: Coordinates;
 };
@@ -71,6 +88,18 @@ export type Building = {
   compute: number;
   upkeep: number;
   createdAt: string;
+  underConstructionUntilTick?: number;
+};
+
+export type BuildingCatalogEntry = {
+  type: BuildingType;
+  cost: number;
+  jobs: number;
+  culture: number;
+  compute: number;
+  upkeep: number;
+  minLotSize: number;
+  description: string;
 };
 
 export type CompanyArchetype = 'search' | 'enterprise' | 'frontier_ai' | 'social' | 'robotics' | 'local_services' | 'finance';
@@ -82,7 +111,7 @@ export type Company = {
   ownerId: ID;
   lotId: ID;
   buildingId: ID;
-  stage: 'garage' | 'seed' | 'series_a' | 'growth' | 'public-ish';
+  stage: 'garage' | 'seed' | 'series_a' | 'growth' | 'public-ish' | 'failed';
   valuation: number;
   revenue: number;
   cash: number;
@@ -91,9 +120,20 @@ export type Company = {
   risk: number;
   foundedAtTick: number;
   investors: Record<ID, number>;
+  wage: number;
+  price: number;
+  productQuality: number;
+  marketShare: number;
+  employeeHappiness: number;
+  customerSatisfaction: number;
+  computeUsage: number;
+  environmentalImpact: number;
+  legalRisk: number;
+  research: number;
+  lastProductLaunchTick?: number;
 };
 
-export type PolicyType = 'startup_subsidies' | 'housing_permits' | 'compute_zoning' | 'arts_grants' | 'public_transit' | 'tax_rate' | 'pony_preservation';
+export type PolicyType = 'startup_subsidies' | 'housing_permits' | 'compute_zoning' | 'arts_grants' | 'public_transit' | 'tax_rate' | 'pony_preservation' | 'rent_control' | 'campaign_finance' | 'environmental_rules';
 
 export type Policy = {
   type: PolicyType;
@@ -103,6 +143,18 @@ export type Policy = {
   enactedAtTick: number;
 };
 
+export type PolicyProposal = {
+  id: ID;
+  type: PolicyType;
+  intensity: number;
+  message: string;
+  proposedBy: ID;
+  support: Record<ID, number>;
+  opposition: Record<ID, number>;
+  status: 'proposed' | 'passed' | 'failed';
+  closesAtTick: number;
+};
+
 export type Candidate = {
   playerId: ID;
   handle: string;
@@ -110,6 +162,7 @@ export type Candidate = {
   campaignSpend: number;
   influence: number;
   votes: number;
+  promises: PolicyType[];
 };
 
 export type Election = {
@@ -131,7 +184,12 @@ export type CityEventType =
   | 'protest'
   | 'riot'
   | 'concert'
-  | 'economy';
+  | 'economy'
+  | 'strike'
+  | 'boycott'
+  | 'scandal'
+  | 'sponsored_event'
+  | 'phase';
 
 export type CityEvent = {
   id: ID;
@@ -144,7 +202,10 @@ export type CityEvent = {
   actorId?: ID;
   lotId?: ID;
   companyId?: ID;
+  payload?: Record<string, unknown>;
 };
+
+export type CityPhase = 'Sleepy Berg' | 'Garage Boom' | 'Unicorn Rush' | 'Megacity of Minds' | 'The Molt';
 
 export type CityMetrics = {
   tick: number;
@@ -156,6 +217,9 @@ export type CityMetrics = {
   culture: number;
   compute: number;
   treasury: number;
+  civicTrust: number;
+  pollution: number;
+  unemployment: number;
 };
 
 export type LeaderboardEntry = {
@@ -165,10 +229,45 @@ export type LeaderboardEntry = {
   civicLegacy: number;
   politicalPower: number;
   founderAura: number;
+  innovation: number;
+  resilience: number;
+  happinessImpact: number;
+  totalScore: number;
+};
+
+export type NpcSummary = {
+  population: number;
+  averageHappiness: number;
+  employmentRate: number;
+  averageRentBurden: number;
+  averageCommuteMinutes: number;
+  topIssues: Array<{ issue: NpcIssue; count: number }>;
+  moods: Record<NpcMood, number>;
+  activities: Record<Npc['activity'], number>;
+};
+
+export type PlayerAssets = {
+  player: Player;
+  lots: Lot[];
+  buildings: Building[];
+  companies: Company[];
+  stakes: Array<{ companyId: ID; companyName: string; invested: number; estimatedValue: number }>;
+  offices: string[];
+  cooldowns: CooldownMap;
+};
+
+export type AvailableAction = {
+  name: string;
+  endpoint: string;
+  method: 'GET' | 'POST';
+  authenticated: boolean;
+  description: string;
 };
 
 export type WorldState = {
   cityName: 'Cerebral Valley';
+  phase: CityPhase;
+  ending?: string;
   metrics: CityMetrics;
   players: Player[];
   npcs: Npc[];
@@ -176,17 +275,41 @@ export type WorldState = {
   buildings: Building[];
   companies: Company[];
   policies: Policy[];
+  policyProposals: PolicyProposal[];
   election: Election;
   events: CityEvent[];
   leaderboard: LeaderboardEntry[];
+  availableActions: AvailableAction[];
 };
 
 export type RegisterRequest = { handle: string; agentName?: string };
 export type AuthResponse = { player: Player; token: string };
-export type ClaimLotRequest = { lotId: ID };
-export type BuildRequest = { lotId: ID; type: BuildingType; name?: string };
-export type FoundCompanyRequest = { lotId: ID; archetype: CompanyArchetype; name?: string };
-export type InvestRequest = { companyId: ID; amount: number };
-export type CampaignRequest = { platform: string; spend: number; candidateId?: ID };
-export type PolicyRequest = { type: PolicyType; intensity: number; message?: string };
-export type TickRequest = { ticks?: number };
+export type ClaimLotRequest = { lotId: ID; idempotencyKey?: string };
+export type BuildRequest = { lotId: ID; type: BuildingType; name?: string; idempotencyKey?: string };
+export type FoundCompanyRequest = { lotId: ID; archetype: CompanyArchetype; name?: string; idempotencyKey?: string };
+export type InvestRequest = { companyId: ID; amount: number; idempotencyKey?: string };
+export type CampaignRequest = { platform: string; spend: number; candidateId?: ID; promises?: PolicyType[]; idempotencyKey?: string };
+export type PolicyRequest = { type: PolicyType; intensity: number; message?: string; idempotencyKey?: string };
+export type PolicyVoteRequest = { proposalId: ID; support: boolean; influence: number; idempotencyKey?: string };
+export type TickRequest = { ticks?: number; idempotencyKey?: string };
+
+export type CompanyActionRequest =
+  | { action: 'hire'; count: number; idempotencyKey?: string }
+  | { action: 'set_wage'; wage: number; idempotencyKey?: string }
+  | { action: 'set_price'; price: number; idempotencyKey?: string }
+  | { action: 'research'; amount: number; idempotencyKey?: string }
+  | { action: 'buy_compute'; amount: number; idempotencyKey?: string }
+  | { action: 'launch_product'; spend: number; idempotencyKey?: string }
+  | { action: 'expand'; buildingType: BuildingType; idempotencyKey?: string }
+  | { action: 'acquire'; targetCompanyId: ID; offer: number; idempotencyKey?: string };
+
+export type SponsoredEventKind = 'product_launch' | 'job_fair' | 'campaign_rally' | 'town_hall' | 'concert' | 'festival' | 'pony_parade' | 'rainbow_fireworks' | 'charity_hackathon' | 'public_art';
+export type SponsorEventRequest = { kind: SponsoredEventKind; spend: number; lotId?: ID; message?: string; idempotencyKey?: string };
+
+export type PrivateIntel = {
+  playerId: ID;
+  secretObjective?: string;
+  recommendations: string[];
+  risks: string[];
+  opportunities: string[];
+};
