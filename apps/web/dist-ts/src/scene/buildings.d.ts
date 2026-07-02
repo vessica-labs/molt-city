@@ -1,0 +1,12 @@
+import * as THREE from 'three';
+import type { Building, Company, Lot } from '@molt-city/shared';
+import { type BrandKit } from './canvasArt';
+export declare function buildingHeight(building: Building): number;
+export declare function renderedRoofline(building: Building, computedHeight: number): number;
+export declare function companyHeight(building: Building, company: Company): number;
+export declare function companyDevelopmentScore(company: Company): number;
+export declare function companiesByLotDevelopment(companies: Company[]): Map<string, Company>;
+export declare function companyColor(archetype: Company['archetype']): number;
+export declare function createRooftopBillboard(company: Pick<Company, 'name' | 'archetype' | 'stage'>, brand: BrandKit, faceWidth: number): THREE.Group;
+export declare function createBuildingModel(building: Building, lot: Lot, company: Company | undefined, tick: number, lotWidth: number, lotDepth: number): THREE.Group<THREE.Object3DEventMap>;
+export declare function shortLabel(label: string): string;

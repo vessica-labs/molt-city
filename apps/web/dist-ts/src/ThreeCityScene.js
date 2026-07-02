@@ -1,6 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { createGagSignTexture, createSkyTexture, createTextSprite, hashFloat } from './scene/canvasArt';
+import { companiesByLotDevelopment, createBuildingModel } from './scene/buildings';
+import { createEnvironment } from './scene/environment';
+import { createBlimp, createBoat, createCar, createDeliveryBot, createHotAirBalloon, createStreetLamp, createTree, createWorldSign, } from './scene/props';
 const MAP_CENTER = { x: 43, y: 45 };
 const MAP_SCALE = 0.55;
 const ROAD_Y = 0.09;
@@ -55,22 +59,31 @@ class CityRenderer {
     peopleGroup = new THREE.Group();
     fxGroup = new THREE.Group();
     cars = [];
+    bots = [];
     boats = [];
-    clouds = [];
+    skyTraffic = [];
     people = new Map();
-    waterMaterial;
+    env;
     resizeObserver;
     animationFrame = 0;
     activeFxKey = '';
     visualWorld = createPreviewWorld();
+    // Animated set pieces harvested from the latest city build
+    spinners = [];
+    tumbleweeds = [];
+    fanBlades = [];
+    orbitRings = [];
+    transitPods = [];
+    beacons = [];
+    flags = [];
     constructor(container) {
         this.container = container;
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x89ddf5);
-        this.scene.fog = new THREE.FogExp2(0x89ddf5, 0.008);
+        this.scene.background = createSkyTexture();
+        this.scene.fog = new THREE.FogExp2(0x9fd9f0, 0.0065);
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
-        this.camera.position.set(43, 38, 43);
-        this.camera.lookAt(new THREE.Vector3(0, 0, 0));
+        this.camera.position.set(46, 40, 46);
+        this.camera.lookAt(new THREE.Vector3(3, 1.5, -3));
         this.camera.zoom = 1.04;
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -78,13 +91,12 @@ class CityRenderer {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 0.96;
+        this.renderer.toneMappingExposure = 1.02;
         this.renderer.domElement.className = 'threeCanvas';
         this.container.appendChild(this.renderer.domElement);
-        this.waterMaterial = createWaterMaterial();
         this.scene.add(this.atmosphereGroup, this.cityGroup, this.trafficGroup, this.peopleGroup, this.fxGroup);
         this.setupLights();
-        this.setupEnvironment();
+        this.env = createEnvironment(this.atmosphereGroup);
         this.setupTraffic();
         this.setWorld(undefined);
         this.resizeObserver = new ResizeObserver(this.resize);
@@ -96,7 +108,7 @@ class CityRenderer {
     setWorld(world) {
         this.visualWorld = world ?? createPreviewWorld();
         const pollution = this.visualWorld.metrics.pollution;
-        this.scene.fog = new THREE.FogExp2(pollution > 42 ? 0x9eb0ba : 0x89ddf5, 0.007 + Math.min(0.008, pollution * 0.00009));
+        this.scene.fog = new THREE.FogExp2(pollution > 42 ? 0x9eb0ba : 0x9fd9f0, 0.006 + Math.min(0.008, pollution * 0.00009));
         this.rebuildCity(this.visualWorld);
         this.syncPeople(this.visualWorld.npcs);
     }
@@ -146,7 +158,7 @@ class CityRenderer {
         const height = Math.max(1, Math.floor(rect.height));
         this.renderer.setSize(width, height, false);
         const aspect = width / height;
-        const frustum = 58;
+        const frustum = 66;
         this.camera.left = (-frustum * aspect) / 2;
         this.camera.right = (frustum * aspect) / 2;
         this.camera.top = frustum / 2;
@@ -155,7 +167,7 @@ class CityRenderer {
     };
     animate = () => {
         const elapsed = this.clock.getElapsedTime();
-        const uTime = this.waterMaterial.uniforms.uTime;
+        const uTime = this.env.waterMaterial.uniforms.uTime;
         if (uTime)
             uTime.value = elapsed;
         for (const actor of this.people.values()) {
@@ -167,25 +179,58 @@ class CityRenderer {
                 actor.icon.position.y = 1.85 + Math.sin(elapsed * 3.1 + actor.bobSeed) * 0.12;
         }
         for (const car of this.cars)
-            updateTrafficActor(car, elapsed);
+            updateTrafficActor(car, elapsed, 0.16);
+        for (const bot of this.bots)
+            updateTrafficActor(bot, elapsed, 0.16);
         for (const boat of this.boats) {
-            boat.group.position.x = 38 + Math.sin(elapsed * boat.speed + boat.phase) * 12;
-            boat.group.position.z = boat.baseZ + Math.cos(elapsed * boat.speed * 0.7 + boat.phase) * 2.4;
-            boat.group.position.y = 0.18 + Math.sin(elapsed * 1.7 + boat.phase) * 0.08;
-            boat.group.rotation.y = -0.55 + Math.sin(elapsed * boat.speed + boat.phase) * 0.18;
+            boat.group.position.x = boat.baseX + Math.sin(elapsed * boat.speed + boat.phase) * boat.radiusX;
+            boat.group.position.z = boat.baseZ + Math.cos(elapsed * boat.speed * 0.7 + boat.phase) * boat.radiusZ;
+            boat.group.position.y = 0.1 + Math.sin(elapsed * 1.7 + boat.phase) * 0.07;
+            boat.group.rotation.y = -0.55 + Math.sin(elapsed * boat.speed + boat.phase) * 0.2;
+            boat.group.rotation.z = Math.sin(elapsed * 1.3 + boat.phase) * 0.03;
         }
-        for (const cloud of this.clouds) {
-            cloud.sprite.position.x = -32 + ((elapsed * cloud.speed + cloud.phase) % 1) * 80;
-            cloud.sprite.position.y = cloud.baseY + Math.sin(elapsed * 0.34 + cloud.phase * 9) * 0.7;
+        for (const flyer of this.skyTraffic) {
+            const t = elapsed * flyer.speed + flyer.phase;
+            flyer.group.position.set(flyer.centerX + Math.cos(t) * flyer.radius, flyer.y + Math.sin(elapsed * 0.5 + flyer.phase) * 0.8, flyer.centerZ + Math.sin(t) * flyer.radius * 0.55);
+            flyer.group.rotation.y = -t + Math.PI / 2;
         }
+        for (const drift of [...this.env.clouds, ...this.env.fogBanks]) {
+            const [minX, maxX] = drift.rangeX;
+            drift.sprite.position.x = minX + ((elapsed * drift.speed + drift.phase) % 1) * (maxX - minX);
+            drift.sprite.position.y = drift.baseY + Math.sin(elapsed * 0.34 + drift.phase * 9) * 0.7;
+        }
+        for (const spinner of this.spinners) {
+            spinner.rotation.y = elapsed * 0.9;
+            spinner.position.y += Math.sin(elapsed * 2) * 0.002;
+        }
+        for (const weed of this.tumbleweeds) {
+            weed.position.x = weed.userData.baseX + Math.sin(elapsed * 0.7 + weed.userData.seed) * 1.1;
+            weed.rotation.z = -elapsed * 2.4;
+        }
+        for (const blade of this.fanBlades)
+            blade.rotation.y = elapsed * 6;
+        for (const ring of this.orbitRings) {
+            ring.rotation.z = elapsed * (0.6 + ring.userData.seed * 0.5);
+        }
+        for (const pod of this.transitPods) {
+            pod.position.x = pod.userData.baseX + Math.sin(elapsed * 0.9 + pod.userData.seed) * 1.3;
+        }
+        for (const beacon of this.beacons) {
+            const material = beacon.material;
+            material.emissiveIntensity = 1.4 + Math.sin(elapsed * 3 + beacon.id) * 0.9;
+        }
+        for (const flag of this.flags)
+            flag.rotation.y = Math.sin(elapsed * 2.4) * 0.4;
+        for (const rotor of this.env.turbineRotors)
+            rotor.rotation.x = elapsed * 1.6;
         this.fxGroup.rotation.y = Math.sin(elapsed * 0.45) * 0.018;
         this.renderer.render(this.scene, this.camera);
         this.animationFrame = requestAnimationFrame(this.animate);
     };
     setupLights() {
-        const hemi = new THREE.HemisphereLight(0xd6f8ff, 0x4c8d4d, 2.25);
+        const hemi = new THREE.HemisphereLight(0xd6f4ff, 0x54804f, 1.9);
         this.scene.add(hemi);
-        const sun = new THREE.DirectionalLight(0xffdf9f, 5.1);
+        const sun = new THREE.DirectionalLight(0xffe3ae, 4.6);
         sun.position.set(-28, 52, -32);
         sun.castShadow = true;
         sun.shadow.mapSize.set(2048, 2048);
@@ -195,71 +240,23 @@ class CityRenderer {
         sun.shadow.camera.bottom = -55;
         sun.shadow.camera.near = 1;
         sun.shadow.camera.far = 140;
+        sun.shadow.bias = -0.0004;
         this.scene.add(sun);
-        const rim = new THREE.DirectionalLight(0x27c7ff, 1.45);
+        const rim = new THREE.DirectionalLight(0x38c4ff, 1.2);
         rim.position.set(34, 26, 26);
         this.scene.add(rim);
-        const glow = new THREE.PointLight(0xff76c7, 65, 45, 2.2);
-        glow.position.set(-9, 9, 4);
-        this.scene.add(glow);
-    }
-    setupEnvironment() {
-        const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(5.8, 48, 24), new THREE.MeshBasicMaterial({ color: 0xffd269, transparent: true, opacity: 0.9 }));
-        sunDisc.position.set(-42, 42, -44);
-        this.atmosphereGroup.add(sunDisc);
-        const groundTexture = createTerrainTexture();
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 57, 1, 1), new THREE.MeshStandardMaterial({ map: groundTexture, color: 0xe6ffe3, roughness: 0.9, metalness: 0.02 }));
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.set(-5, 0, 0);
-        ground.receiveShadow = true;
-        this.atmosphereGroup.add(ground);
-        const base = new THREE.Mesh(new THREE.BoxGeometry(70, 1.2, 57), new THREE.MeshStandardMaterial({ color: 0x236747, roughness: 0.98 }));
-        base.position.set(-5, -0.76, 0);
-        base.receiveShadow = true;
-        this.atmosphereGroup.add(base);
-        const water = new THREE.Mesh(new THREE.PlaneGeometry(48, 96, 120, 120), this.waterMaterial);
-        water.rotation.x = -Math.PI / 2;
-        water.position.set(55.5, -0.16, 0);
-        water.receiveShadow = true;
-        this.atmosphereGroup.add(water);
-        const seawall = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.48, 58), new THREE.MeshStandardMaterial({ color: 0x9eaeb4, roughness: 0.72, metalness: 0.08 }));
-        seawall.position.set(30.55, 0.15, 0);
-        seawall.castShadow = true;
-        seawall.receiveShadow = true;
-        this.atmosphereGroup.add(seawall);
-        for (let i = 0; i < 5; i += 1) {
-            const foam = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 58, 1, 1), new THREE.MeshBasicMaterial({ color: 0xf6ffff, transparent: true, opacity: 0.22 - i * 0.025, side: THREE.DoubleSide }));
-            foam.rotation.x = -Math.PI / 2;
-            foam.position.set(31.55 + i * 0.72, 0.018, 0);
-            this.atmosphereGroup.add(foam);
-        }
-        const hillMaterial = new THREE.MeshStandardMaterial({ color: 0x3ea369, roughness: 0.88, flatShading: true });
-        for (let i = 0; i < 7; i += 1) {
-            const hill = new THREE.Mesh(new THREE.ConeGeometry(4 + i * 0.28, 6 + (i % 3) * 1.6, 5), hillMaterial.clone());
-            hill.position.set(-39 + i * 5.3, 2.15, -34 - (i % 2) * 2.8);
-            hill.rotation.y = i * 0.33;
-            hill.receiveShadow = true;
-            this.atmosphereGroup.add(hill);
-        }
-        for (let i = 0; i < 7; i += 1) {
-            const cloud = createCloudSprite(0.55 + (i % 3) * 0.14);
-            cloud.position.set(-30 + i * 12, 24 + (i % 2) * 3.5, -22 - i * 1.8);
-            this.clouds.push({ sprite: cloud, baseY: cloud.position.y, speed: 0.006 + i * 0.0015, phase: i * 0.17 });
-            this.atmosphereGroup.add(cloud);
-        }
-        const citySparkles = createSparkleCloud(new THREE.Vector3(-4, 8, 1), 0xffffff, 120, 36);
-        citySparkles.name = 'ambient-sparkles';
-        this.atmosphereGroup.add(citySparkles);
+        const bounce = new THREE.DirectionalLight(0xffd6f2, 0.5);
+        bounce.position.set(10, 8, 40);
+        this.scene.add(bounce);
     }
     setupTraffic() {
-        const colors = [0xff5b6e, 0xffd166, 0x4cc9f0, 0xffffff, 0x95ff8a, 0xbba7ff];
+        const colors = [0xff5b6e, 0xffd166, 0x4cc9f0, 0xf3f6fa, 0x95ff8a, 0xbba7ff, 0x2b3350];
         const horizontalLanes = [-19.8, -9.9, 0, 9.9, 19.8];
         const verticalLanes = [-23.1, -15.4, -7.7, 0, 7.7, 15.4];
-        for (let i = 0; i < 16; i += 1) {
+        for (let i = 0; i < 18; i += 1) {
             const axis = i % 2 === 0 ? 'x' : 'z';
             const color = colors[i % colors.length] ?? 0xffffff;
-            const group = createCar(color);
-            group.visible = i < 14;
+            const group = createCar(color, i % 4 === 0);
             this.trafficGroup.add(group);
             if (axis === 'x') {
                 const lane = horizontalLanes[i % horizontalLanes.length] ?? 0;
@@ -270,12 +267,36 @@ class CityRenderer {
                 this.cars.push({ group, axis, fixed: lane, laneOffset: i % 4 < 2 ? -0.34 : 0.34, min: -24, max: 24, speed: 0.024 + i * 0.0014, phase: i * 0.061, direction: i % 3 === 0 ? -1 : 1 });
             }
         }
-        for (let i = 0; i < 3; i += 1) {
-            const boat = createBoat(i === 0 ? 0xfff7d6 : i === 1 ? 0x9cecff : 0xff9fc6);
-            boat.position.set(45 + i * 7, 0.18, -22 + i * 20);
-            this.boats.push({ group: boat, baseZ: boat.position.z, speed: 0.24 + i * 0.07, phase: i * 1.8 });
-            this.trafficGroup.add(boat);
+        // Sidewalk delivery bots trundling along their own beat
+        for (let i = 0; i < 5; i += 1) {
+            const bot = createDeliveryBot(`bot:${i}`);
+            this.trafficGroup.add(bot);
+            const axis = i % 2 === 0 ? 'x' : 'z';
+            const lane = axis === 'x' ? (horizontalLanes[i % horizontalLanes.length] ?? 0) + 1.05 : (verticalLanes[i % verticalLanes.length] ?? 0) + 1.05;
+            this.bots.push({ group: bot, axis, fixed: lane, laneOffset: 0, min: -20, max: 18, speed: 0.008 + i * 0.0012, phase: i * 0.21, direction: i % 2 === 0 ? 1 : -1 });
         }
+        // Bay traffic: sailboats, a ferry, a show-off speedboat
+        const boatSpecs = [
+            { kind: 'sail', accent: 0xff9fc6, baseX: 42, baseZ: -8, radiusX: 6, radiusZ: 4, speed: 0.16 },
+            { kind: 'sail', accent: 0x4cc9f0, baseX: 50, baseZ: 20, radiusX: 8, radiusZ: 5, speed: 0.12 },
+            { kind: 'ferry', accent: 0x2b6cb0, baseX: 56, baseZ: 2, radiusX: 14, radiusZ: 3, speed: 0.07 },
+            { kind: 'speed', accent: 0xffd166, baseX: 64, baseZ: -12, radiusX: 10, radiusZ: 7, speed: 0.28 },
+        ];
+        boatSpecs.forEach((spec, i) => {
+            const boat = createBoat(spec.kind, spec.accent);
+            boat.position.set(spec.baseX, 0.1, spec.baseZ);
+            this.boats.push({ group: boat, baseX: spec.baseX, baseZ: spec.baseZ, radiusX: spec.radiusX, radiusZ: spec.radiusZ, speed: spec.speed, phase: i * 1.7 });
+            this.trafficGroup.add(boat);
+        });
+        // Sky traffic: the MOLT AIR blimp and a hot air balloon
+        const blimp = createBlimp(createGagSignTexture(['MOLT AIR', 'now boarding vibes'], 'banner'));
+        blimp.scale.setScalar(1.15);
+        this.trafficGroup.add(blimp);
+        this.skyTraffic.push({ group: blimp, centerX: -2, centerZ: -4, y: 21, radius: 24, speed: 0.05, phase: 0 });
+        const balloon = createHotAirBalloon();
+        balloon.scale.setScalar(0.9);
+        this.trafficGroup.add(balloon);
+        this.skyTraffic.push({ group: balloon, centerX: 14, centerZ: 8, y: 16, radius: 9, speed: 0.03, phase: 2.4 });
     }
     rebuildCity(world) {
         clearGroup(this.cityGroup, true);
@@ -288,10 +309,45 @@ class CityRenderer {
         }
         this.addDistrictLabels(world.lots);
         this.addMetricBadges(world);
+        this.harvestAnimatedProps();
+    }
+    harvestAnimatedProps() {
+        this.spinners = [];
+        this.tumbleweeds = [];
+        this.fanBlades = [];
+        this.orbitRings = [];
+        this.transitPods = [];
+        this.beacons = [];
+        this.flags = [];
+        this.cityGroup.traverse((node) => {
+            if (node.name === 'logo-spinner')
+                this.spinners.push(node);
+            else if (node.name === 'tumbleweed') {
+                node.userData.baseX = node.position.x;
+                node.userData.seed = hashFloat(node.uuid) * 6;
+                this.tumbleweeds.push(node);
+            }
+            else if (node.name.startsWith('fan-blade'))
+                this.fanBlades.push(node);
+            else if (node.name.startsWith('orbit-ring')) {
+                node.userData.seed = hashFloat(node.uuid);
+                this.orbitRings.push(node);
+            }
+            else if (node.name === 'transit-pod') {
+                node.userData.baseX = node.position.x;
+                node.userData.seed = hashFloat(node.uuid) * 6;
+                this.transitPods.push(node);
+            }
+            else if (node.name === 'beacon' && node instanceof THREE.Mesh)
+                this.beacons.push(node);
+            else if (node.name === 'civic-flag')
+                this.flags.push(node);
+        });
     }
     addRoadNetwork(lots) {
-        const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x4c5c68, roughness: 0.78, metalness: 0.04 });
-        const lineMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0a6, emissive: 0xffd166, emissiveIntensity: 0.35, roughness: 0.5 });
+        const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x424e59, roughness: 0.85, metalness: 0.03 });
+        const sidewalkMaterial = new THREE.MeshStandardMaterial({ color: 0xb8c2c9, roughness: 0.9 });
+        const lineMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0a6, emissive: 0xffd166, emissiveIntensity: 0.3, roughness: 0.5 });
         const crosswalkMaterial = new THREE.MeshStandardMaterial({ color: 0xfafcff, roughness: 0.65 });
         const xs = uniqueSorted(lots.map((lot) => gridToWorld(lot.coordinates).x));
         const zs = uniqueSorted(lots.map((lot) => gridToWorld(lot.coordinates).z));
@@ -304,27 +360,40 @@ class CityRenderer {
         const xRoads = betweenAndEdges(xs, 4.2);
         const zRoads = betweenAndEdges(zs, 5.1);
         for (const z of zRoads) {
-            const road = new THREE.Mesh(new THREE.BoxGeometry(maxX - minX, 0.12, 1.64), roadMaterial.clone());
+            const road = new THREE.Mesh(new THREE.BoxGeometry(maxX - minX, 0.12, 1.64), roadMaterial);
             road.position.set((minX + maxX) / 2, ROAD_Y, z);
             road.receiveShadow = true;
             this.cityGroup.add(road);
+            for (const side of [-1.06, 1.06]) {
+                const walk = new THREE.Mesh(new THREE.BoxGeometry(maxX - minX, 0.13, 0.42), sidewalkMaterial);
+                walk.position.set((minX + maxX) / 2, ROAD_Y, z + side);
+                walk.receiveShadow = true;
+                this.cityGroup.add(walk);
+            }
             addDashes(this.cityGroup, 'x', z, minX, maxX, lineMaterial);
         }
         for (const x of xRoads) {
-            const road = new THREE.Mesh(new THREE.BoxGeometry(1.64, 0.13, maxZ - minZ), roadMaterial.clone());
+            const road = new THREE.Mesh(new THREE.BoxGeometry(1.64, 0.13, maxZ - minZ), roadMaterial);
             road.position.set(x, ROAD_Y + 0.005, (minZ + maxZ) / 2);
             road.receiveShadow = true;
             this.cityGroup.add(road);
             addDashes(this.cityGroup, 'z', x, minZ, maxZ, lineMaterial);
         }
+        let lampToggle = 0;
         for (const x of xRoads) {
             for (const z of zRoads) {
                 if (Math.abs(x) > 27 || Math.abs(z) > 24)
                     continue;
                 for (let stripe = -1; stripe <= 1; stripe += 1) {
-                    const walk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.035, 1.32), crosswalkMaterial.clone());
+                    const walk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.035, 1.32), crosswalkMaterial);
                     walk.position.set(x + stripe * 0.36, ROAD_Y + 0.095, z);
                     this.cityGroup.add(walk);
+                }
+                lampToggle += 1;
+                if (lampToggle % 3 === 0) {
+                    const lamp = createStreetLamp();
+                    lamp.position.set(x + 1.1, ROAD_Y, z + 1.1);
+                    this.cityGroup.add(lamp);
                 }
             }
         }
@@ -347,7 +416,7 @@ class CityRenderer {
         group.add(bevel);
         addLotSurfaceDetails(group, lot, width, depth);
         if (building) {
-            const model = createBuildingModel(building, lot, company, tick);
+            const model = createBuildingModel(building, lot, company, tick, width, depth);
             model.position.y = LOT_Y + 0.19;
             group.add(model);
         }
@@ -460,8 +529,8 @@ function addDashes(group, axis, fixed, min, max, material) {
     for (let index = 0; index < count; index += 1) {
         const t = (index + 0.5) / count;
         const dash = axis === 'x'
-            ? new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.04, 0.08), material.clone())
-            : new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 1.38), material.clone());
+            ? new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.04, 0.08), material)
+            : new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 1.38), material);
         if (axis === 'x')
             dash.position.set(min + length * t, ROAD_Y + 0.1, fixed);
         else
@@ -473,8 +542,9 @@ function addLotSurfaceDetails(group, lot, width, depth) {
     if (lot.zone === 'park' || lot.zone === 'residential') {
         const treeCount = lot.zone === 'park' ? 6 + lot.size : 2;
         for (let index = 0; index < treeCount; index += 1) {
-            const tree = createTree(0.62 + (index % 3) * 0.11);
-            tree.position.set(-width / 2 + 1.0 + ((index * 1.73) % Math.max(1, width - 2)), LOT_Y + 0.21, -depth / 2 + 0.9 + ((index * 2.31) % Math.max(1, depth - 1.8)));
+            const kind = lot.zone === 'park' ? (index % 3 === 0 ? 'redwood' : 'oak') : 'oak';
+            const tree = createTree(kind, 0.62 + (index % 3) * 0.12, `${lot.id}:tree:${index}`);
+            tree.position.set(-width / 2 + 1.0 + ((index * 1.73) % Math.max(1, width - 2)), LOT_Y + 0.17, -depth / 2 + 0.9 + ((index * 2.31) % Math.max(1, depth - 1.8)));
             group.add(tree);
         }
     }
@@ -504,14 +574,14 @@ function addEmptyLotModel(group, lot, width, depth) {
     const gridMaterial = new THREE.LineBasicMaterial({ color: 0x526173, transparent: true, opacity: 0.34 });
     const lines = new THREE.Group();
     for (let index = -2; index <= 2; index += 1) {
-        const lineA = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-width * 0.26, LOT_Y + 0.35, index * depth * 0.06), new THREE.Vector3(width * 0.26, LOT_Y + 0.35, index * depth * 0.06)]), gridMaterial.clone());
-        const lineB = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(index * width * 0.065, LOT_Y + 0.36, -depth * 0.22), new THREE.Vector3(index * width * 0.065, LOT_Y + 0.36, depth * 0.22)]), gridMaterial.clone());
+        const lineA = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-width * 0.26, LOT_Y + 0.35, index * depth * 0.06), new THREE.Vector3(width * 0.26, LOT_Y + 0.35, index * depth * 0.06)]), gridMaterial);
+        const lineB = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(index * width * 0.065, LOT_Y + 0.36, -depth * 0.22), new THREE.Vector3(index * width * 0.065, LOT_Y + 0.36, depth * 0.22)]), gridMaterial);
         lines.add(lineA, lineB);
     }
     group.add(lines);
-    const sign = createTextSprite(lot.zone === 'park' ? 'PUBLIC PARK' : 'API LOT', { background: 'rgba(255,246,184,.92)', color: '#202858', accent: '#ff66c4' });
-    sign.position.set(-width * 0.25, LOT_Y + 1.15, -depth * 0.22);
-    sign.scale.multiplyScalar(0.45);
+    const sign = createWorldSign(lot.zone === 'park' ? ['PUBLIC PARK'] : ['API LOT', 'your startup here?'], lot.zone === 'park' ? 'banner' : 'cardboard', 1.35, 0.62, 0.42);
+    sign.position.set(-width * 0.25, LOT_Y + 0.2, depth * 0.28);
+    sign.rotation.y = 0.3;
     group.add(sign);
 }
 function createOwnershipGlow(width, depth) {
@@ -519,517 +589,6 @@ function createOwnershipGlow(width, depth) {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = LOT_Y + 0.185;
     return ring;
-}
-function createBuildingModel(building, lot, company, tick) {
-    const group = new THREE.Group();
-    const width = Math.min(lotWidth(lot) * 0.72, 5.8 + lot.size * 0.3);
-    const depth = Math.min(lotDepth(lot) * 0.67, 5.6 + lot.size * 0.25);
-    const baseHeight = buildingHeight(building);
-    const roofline = renderedRoofline(building, baseHeight);
-    const height = company ? companyHeight(building, company) : baseHeight;
-    switch (building.type) {
-        case 'garage':
-            createGarage(group, building, width, depth);
-            break;
-        case 'coffee_shop':
-            createCoffeeShop(group, building, width, depth);
-            break;
-        case 'coworking_loft':
-            createCoworking(group, building, width, depth, height);
-            break;
-        case 'research_lab':
-            createResearchLab(group, building, width, depth, height);
-            break;
-        case 'data_center_greenhouse':
-            createDataCenter(group, building, width, depth);
-            break;
-        case 'model_foundry':
-            createModelFoundry(group, building, width, depth);
-            break;
-        case 'civic_hall':
-            createCivicHall(group, building, width, depth);
-            break;
-        case 'transit_kiosk':
-            createTransitKiosk(group, building, width, depth);
-            break;
-        case 'pony_meadow':
-            createPonyMeadow(group, building, width, depth);
-            break;
-        case 'concert_shell':
-            createConcertShell(group, building, width, depth);
-            break;
-        case 'mixed_use_tower':
-            createMixedUseTower(group, building, width, depth, height);
-            break;
-        default:
-            createGenericBuilding(group, building, width, depth, height);
-    }
-    if (building.underConstructionUntilTick && building.underConstructionUntilTick > tick) {
-        addConstructionOverlay(group, width, depth, Math.max(2.6, height));
-    }
-    if (company) {
-        addBusinessGrowth(group, building, company, width, depth, roofline, height);
-    }
-    const name = createTextSprite(shortLabel(building.name), { background: 'rgba(19,26,58,.72)', color: '#eaffff', accent: '#6ee7ff' });
-    name.position.set(0, Math.max(2.7, height + 1.15), -depth * 0.56);
-    name.scale.multiplyScalar(0.36);
-    group.add(name);
-    return group;
-}
-function buildingHeight(building) {
-    const typeBase = {
-        garage: 2.3,
-        coffee_shop: 2.7,
-        coworking_loft: 5.8,
-        research_lab: 5.4,
-        data_center_greenhouse: 4.5,
-        model_foundry: 6.4,
-        civic_hall: 5.1,
-        transit_kiosk: 2.2,
-        pony_meadow: 1.7,
-        concert_shell: 3.5,
-        mixed_use_tower: 12.4,
-    };
-    return Math.min(18, typeBase[building.type] + building.level * 0.72 + building.jobs * 0.08 + building.compute * 0.12);
-}
-function renderedRoofline(building, computedHeight) {
-    const fixedTypeRoofline = {
-        garage: 2.65,
-        coffee_shop: 2.55,
-        data_center_greenhouse: 4.85,
-        model_foundry: 7.9,
-        civic_hall: 5.05,
-        transit_kiosk: 1.7,
-        pony_meadow: 2.15,
-        concert_shell: 3.15,
-    };
-    return fixedTypeRoofline[building.type] ?? computedHeight;
-}
-function companyHeight(building, company) {
-    const stageBoost = {
-        garage: 0,
-        seed: 1.4,
-        series_a: 3.2,
-        growth: 5.6,
-        'public-ish': 8.4,
-        failed: 0,
-    };
-    const valuationBoost = Math.log10(Math.max(1, company.valuation / 3_000)) * 4.8;
-    const researchBoost = Math.min(3.2, company.research / 2_000);
-    const marketBoost = company.marketShare / 16;
-    const capitalBoost = Math.max(0, Math.log10(Math.max(1, company.cash + 1_200)) - 3) * 1.4;
-    return Math.min(30, buildingHeight(building) + (stageBoost[company.stage] ?? 0) + valuationBoost + researchBoost + marketBoost + capitalBoost);
-}
-function companiesByLotDevelopment(companies) {
-    const byLot = new Map();
-    for (const company of companies) {
-        const existing = byLot.get(company.lotId);
-        if (!existing || companyDevelopmentScore(company) > companyDevelopmentScore(existing)) {
-            byLot.set(company.lotId, company);
-        }
-    }
-    return byLot;
-}
-function companyDevelopmentScore(company) {
-    const stageScore = {
-        garage: 0,
-        seed: 8_000,
-        series_a: 22_000,
-        growth: 46_000,
-        'public-ish': 90_000,
-        failed: 0,
-    };
-    return company.valuation + company.research * 4 + company.marketShare * 950 + (stageScore[company.stage] ?? 0);
-}
-function addBusinessGrowth(group, building, company, width, depth, baseHeight, height) {
-    const growth = Math.max(0, height - baseHeight);
-    const color = companyColor(company.archetype);
-    const isFailed = company.stage === 'failed';
-    const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: isFailed ? 0.18 : 0.42, roughness: 0.25, metalness: 0.28, transparent: true, opacity: isFailed ? 0.62 : 0.88 });
-    const trim = new THREE.MeshStandardMaterial({ color: 0xeaffff, emissive: color, emissiveIntensity: 0.75, roughness: 0.28, metalness: 0.18 });
-    if (growth > 1.1) {
-        const towerHeight = Math.max(1.6, growth * 0.72);
-        const towerWidth = width * (building.type === 'garage' || building.type === 'coffee_shop' ? 0.5 : 0.38);
-        const towerDepth = depth * (building.type === 'garage' || building.type === 'coffee_shop' ? 0.46 : 0.36);
-        addBlock(group, towerWidth, towerHeight, towerDepth, width * 0.13, baseHeight + towerHeight / 2, depth * 0.04, glow);
-        addWindows(group, towerWidth, towerHeight - 0.2, towerDepth, baseHeight, Math.floor(towerHeight * 1.5), `${company.id}:growth`);
-    }
-    if (growth > 3.4) {
-        const secondHeight = Math.max(1.2, growth * 0.46);
-        addBlock(group, width * 0.28, secondHeight, depth * 0.3, -width * 0.2, baseHeight + secondHeight / 2, -depth * 0.1, glow.clone());
-        addNeonStrip(group, -width * 0.18, baseHeight + secondHeight + 0.16, -depth * 0.28, width * 0.32, color);
-    }
-    if (growth > 5.8 || company.stage === 'growth' || company.stage === 'public-ish') {
-        const crown = new THREE.Mesh(new THREE.CylinderGeometry(width * 0.2, width * 0.28, 0.52, 6), trim);
-        crown.position.set(0, height + 0.36, 0);
-        crown.rotation.y = Math.PI / 6;
-        crown.castShadow = true;
-        group.add(crown);
-        addAntenna(group, width * 0.2, height + 0.45, -depth * 0.08, color);
-    }
-    if (height >= 6.4 || companyDevelopmentScore(company) > 18_000) {
-        addRooftopCompanySign(group, company, width, depth, height, color);
-    }
-}
-function addRooftopCompanySign(group, company, width, depth, height, color) {
-    const isFailed = company.stage === 'failed';
-    const signText = isFailed ? `${shortCompanyLabel(company.name)} RIP` : shortCompanyLabel(company.name);
-    const sign = createTextSprite(signText, { background: isFailed ? 'rgba(45,45,58,.82)' : 'rgba(15,22,55,.86)', color: '#f5ffff', accent: `#${color.toString(16).padStart(6, '0')}` });
-    sign.position.set(0, height + 1.45, -depth * 0.56);
-    sign.scale.set(Math.max(8.2, width * 1.55), 2.05, 1);
-    sign.renderOrder = 30;
-    sign.material.depthTest = false;
-    group.add(sign);
-    const facade = createTextSprite(signText, { background: isFailed ? 'rgba(235,239,236,.74)' : 'rgba(255,255,255,.86)', color: isFailed ? '#45495a' : '#17204f', accent: `#${color.toString(16).padStart(6, '0')}` });
-    facade.position.set(0, Math.max(2.4, height - 0.75), -depth * 0.55);
-    facade.scale.set(Math.max(5.8, width * 1.15), 1.35, 1);
-    facade.renderOrder = 29;
-    facade.material.depthTest = false;
-    group.add(facade);
-    const posts = new THREE.Group();
-    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x1c244a, roughness: 0.42, metalness: 0.55 });
-    for (const x of [-width * 0.28, width * 0.28]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.05, 0.08), postMaterial.clone());
-        post.position.set(x, height + 0.52, -depth * 0.53);
-        posts.add(post);
-    }
-    const railMaterial = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.2, roughness: 0.24 });
-    const topRail = new THREE.Mesh(new THREE.BoxGeometry(Math.max(4.6, width * 1.05), 0.07, 0.08), railMaterial);
-    topRail.position.set(0, height + 1.72, -depth * 0.54);
-    const bottomRail = topRail.clone();
-    bottomRail.position.y = height + 0.62;
-    posts.add(topRail, bottomRail);
-    group.add(posts);
-}
-function companyColor(archetype) {
-    const colors = {
-        search: 0x4cc9f0,
-        enterprise: 0x9b8cff,
-        frontier_ai: 0x40ffe0,
-        social: 0xff66c4,
-        robotics: 0xffd166,
-        local_services: 0x66e084,
-        finance: 0xff8c42,
-    };
-    return colors[archetype] ?? 0x6ee7ff;
-}
-function shortCompanyLabel(name) {
-    const stopwords = new Set(['the', 'and', 'of', 'for']);
-    const words = name.split(/\s+/).filter((word) => word && !stopwords.has(word.toLowerCase()));
-    if (words.length <= 2)
-        return name.toUpperCase();
-    const core = words.slice(0, 3).map((word) => word.replace(/[^a-z0-9]/gi, '')).filter(Boolean);
-    return core.join(' ').toUpperCase();
-}
-function createGarage(group, building, width, depth) {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x7161d9, roughness: 0.78, metalness: 0.05 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x4d3f9d, roughness: 0.62, metalness: 0.08 });
-    addBlock(group, width * 0.68, 1.55, depth * 0.6, 0, 0.78, 0, bodyMat);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(width, depth) * 0.38, 1.15, 4), roofMat);
-    roof.position.set(0, 2.05, 0);
-    roof.rotation.y = Math.PI / 4;
-    roof.castShadow = true;
-    group.add(roof);
-    addDoor(group, 0, 0.75, depth * -0.31, 1.1, 1.1, 0x222858);
-    addNeonStrip(group, width * -0.22, 1.52, depth * -0.33, 0.95, 0x81fff5);
-    const dish = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 10, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0xeef8ff, roughness: 0.25, metalness: 0.65 }));
-    dish.position.set(width * 0.23, 2.38, 0.18);
-    dish.rotation.x = -0.8;
-    group.add(dish);
-    addWindows(group, width * 0.68, 1.25, depth * 0.6, 0.15, 1, building.id);
-}
-function createCoffeeShop(group, building, width, depth) {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff9fbc, roughness: 0.68, metalness: 0.04 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0xffd166, roughness: 0.6 });
-    addBlock(group, width * 0.66, 2.15, depth * 0.58, 0, 1.08, 0, bodyMat);
-    addBlock(group, width * 0.72, 0.32, depth * 0.64, 0, 2.34, 0, roofMat);
-    addWindows(group, width * 0.66, 1.7, depth * 0.58, 0.28, 2, building.id);
-    for (let i = 0; i < 5; i += 1) {
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(width * 0.12, 0.18, 0.16), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xffffff : 0xff4d80, roughness: 0.52 }));
-        stripe.position.set(-width * 0.25 + i * width * 0.125, 1.38, -depth * 0.36);
-        stripe.castShadow = true;
-        group.add(stripe);
-    }
-    for (let i = 0; i < 2; i += 1) {
-        const steam = createSteamPuff(0.34 + i * 0.08);
-        steam.position.set(width * (0.1 + i * 0.08), 2.8 + i * 0.4, -depth * 0.08);
-        group.add(steam);
-    }
-    addPatioSet(group, -width * 0.32, -depth * 0.38);
-}
-function createCoworking(group, building, width, depth, height) {
-    const glass = new THREE.MeshStandardMaterial({ color: 0x58c7ef, emissive: 0x08324d, emissiveIntensity: 0.24, roughness: 0.28, metalness: 0.24, transparent: true, opacity: 0.92 });
-    const core = new THREE.MeshStandardMaterial({ color: 0x2d5c87, roughness: 0.58, metalness: 0.12 });
-    addBlock(group, width * 0.82, height, depth * 0.82, 0, height / 2, 0, glass);
-    addBlock(group, width * 0.18, height + 0.35, depth * 0.9, -width * 0.28, (height + 0.35) / 2, 0, core);
-    addWindows(group, width * 0.82, height - 0.35, depth * 0.82, 0.2, Math.floor(height), building.id);
-    addRooftopGarden(group, width, depth, height);
-}
-function createResearchLab(group, building, width, depth, height) {
-    const white = new THREE.MeshStandardMaterial({ color: 0xe9fff9, roughness: 0.5, metalness: 0.08 });
-    const teal = new THREE.MeshStandardMaterial({ color: 0x23cdb8, emissive: 0x0e6059, emissiveIntensity: 0.22, roughness: 0.42 });
-    addBlock(group, width * 0.7, height * 0.72, depth * 0.76, -width * 0.08, height * 0.36, 0, white);
-    addBlock(group, width * 0.38, height * 0.48, depth * 0.5, width * 0.25, height * 0.24, -depth * 0.05, teal);
-    addWindows(group, width * 0.7, height * 0.65, depth * 0.76, 0.2, Math.floor(height), building.id);
-    const reactor = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, height * 0.82, 28), new THREE.MeshStandardMaterial({ color: 0x9fffee, emissive: 0x40ffe0, emissiveIntensity: 0.9, transparent: true, opacity: 0.58, roughness: 0.18, metalness: 0.06 }));
-    reactor.position.set(width * 0.2, height * 0.43, depth * 0.2);
-    reactor.castShadow = true;
-    group.add(reactor);
-    addAntenna(group, -width * 0.25, height * 0.76, -depth * 0.2, 0x40ffe0);
-}
-function createDataCenter(group, building, width, depth) {
-    const dark = new THREE.MeshStandardMaterial({ color: 0x1d284f, roughness: 0.42, metalness: 0.28 });
-    const glass = new THREE.MeshStandardMaterial({ color: 0x32e0c4, emissive: 0x19d8b8, emissiveIntensity: 0.55, transparent: true, opacity: 0.72, roughness: 0.25 });
-    addBlock(group, width * 0.92, 3.8, depth * 0.78, 0, 1.9, 0, dark);
-    addBlock(group, width * 0.84, 0.64, depth * 0.58, 0, 4.18, 0, glass);
-    for (let i = 0; i < 5; i += 1)
-        addNeonStrip(group, -width * 0.34 + i * width * 0.17, 2.45, -depth * 0.41, 0.88, 0x40ffe0);
-    for (let i = 0; i < 3; i += 1) {
-        const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.18, 28), new THREE.MeshStandardMaterial({ color: 0xd7fff8, roughness: 0.3, metalness: 0.55 }));
-        fan.position.set(-width * 0.26 + i * width * 0.26, 4.6, depth * 0.1);
-        fan.castShadow = true;
-        group.add(fan);
-    }
-    addAntenna(group, width * 0.34, 4.52, -depth * 0.16, 0x40ffe0);
-    addWindows(group, width * 0.92, 2.8, depth * 0.78, 0.45, 3, building.id);
-}
-function createModelFoundry(group, building, width, depth) {
-    const steel = new THREE.MeshStandardMaterial({ color: 0x36384f, roughness: 0.58, metalness: 0.5 });
-    const orange = new THREE.MeshStandardMaterial({ color: 0xff9452, emissive: 0xff5d2e, emissiveIntensity: 1.1, roughness: 0.34 });
-    addBlock(group, width * 0.88, 4.6, depth * 0.76, 0, 2.3, 0, steel);
-    addBlock(group, width * 0.5, 1.2, depth * 0.45, -width * 0.08, 5.2, 0, steel.clone());
-    addBlock(group, width * 0.32, 1.8, 0.16, width * 0.22, 1.65, -depth * 0.41, orange);
-    for (let i = 0; i < 2; i += 1) {
-        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.35, 3.1, 16), steel.clone());
-        stack.position.set(width * (0.22 + i * 0.17), 6.3, depth * 0.16);
-        stack.castShadow = true;
-        group.add(stack);
-        const smoke = createSteamPuff(0.45);
-        smoke.position.set(stack.position.x, 8.1 + i * 0.42, stack.position.z);
-        group.add(smoke);
-    }
-    addNeonStrip(group, -width * 0.36, 3.7, -depth * 0.42, 1.4, 0xff9452);
-    addWindows(group, width * 0.88, 3.5, depth * 0.76, 0.48, 4, building.id);
-}
-function createCivicHall(group, building, width, depth) {
-    const body = new THREE.MeshStandardMaterial({ color: 0xffb8d2, roughness: 0.62, metalness: 0.04 });
-    const stone = new THREE.MeshStandardMaterial({ color: 0xfff4fb, roughness: 0.7 });
-    addBlock(group, width * 0.78, 3.1, depth * 0.64, 0, 1.55, 0, body);
-    addBlock(group, width * 0.88, 0.42, depth * 0.74, 0, 3.35, 0, stone);
-    for (let i = 0; i < 5; i += 1) {
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 2.4, 14), stone.clone());
-        col.position.set(-width * 0.28 + i * width * 0.14, 1.55, -depth * 0.36);
-        col.castShadow = true;
-        group.add(col);
-    }
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.2, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2), stone.clone());
-    dome.position.set(0, 3.58, 0);
-    dome.castShadow = true;
-    group.add(dome);
-    addAntenna(group, 0, 4.8, 0, 0xff7db6);
-    addWindows(group, width * 0.78, 2.3, depth * 0.64, 0.38, 3, building.id);
-}
-function createTransitKiosk(group, _building, width, depth) {
-    const base = new THREE.MeshStandardMaterial({ color: 0x78a7ff, roughness: 0.52, metalness: 0.1 });
-    const roof = new THREE.MeshStandardMaterial({ color: 0xfff2a2, roughness: 0.46 });
-    addBlock(group, width * 0.5, 1.35, depth * 0.34, 0, 0.68, 0, base);
-    addBlock(group, width * 0.78, 0.25, depth * 0.48, 0, 1.52, 0, roof);
-    for (let i = -1; i <= 1; i += 2) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(width * 0.92, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: 0xdbe6ec, roughness: 0.3, metalness: 0.75 }));
-        rail.position.set(0, 0.24, depth * 0.31 * i);
-        group.add(rail);
-    }
-    const tram = new THREE.Mesh(new THREE.BoxGeometry(width * 0.55, 0.62, 0.44), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x4cc9f0, emissiveIntensity: 0.12, roughness: 0.36 }));
-    tram.position.set(0, 0.66, depth * 0.31);
-    tram.castShadow = true;
-    group.add(tram);
-}
-function createPonyMeadow(group, _building, width, depth) {
-    for (let index = 0; index < 7; index += 1) {
-        const flower = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshStandardMaterial({ color: index % 2 ? 0xff66c4 : 0xfff06b, emissive: index % 2 ? 0xff66c4 : 0xffd166, emissiveIntensity: 0.22 }));
-        flower.position.set(-width * 0.36 + (index % 4) * width * 0.18, 0.52, -depth * 0.22 + Math.floor(index / 4) * depth * 0.22);
-        group.add(flower);
-    }
-    const pony = createPony();
-    pony.position.set(-width * 0.08, 0.72, 0.1);
-    group.add(pony);
-    const rainbowColors = [0xff4d80, 0xffd166, 0x66e084, 0x4cc9f0, 0x9b5cff];
-    for (let index = 0; index < rainbowColors.length; index += 1) {
-        const arc = new THREE.Mesh(new THREE.TorusGeometry(1.65 + index * 0.13, 0.045, 8, 48, Math.PI), new THREE.MeshStandardMaterial({ color: rainbowColors[index] ?? 0xffffff, emissive: rainbowColors[index] ?? 0xffffff, emissiveIntensity: 0.45 }));
-        arc.position.set(width * 0.18, 1.15, -depth * 0.16 + index * 0.02);
-        group.add(arc);
-    }
-}
-function createConcertShell(group, building, width, depth) {
-    const stage = new THREE.MeshStandardMaterial({ color: 0x6d51d9, roughness: 0.45, metalness: 0.12 });
-    const shell = new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xff70bf, emissiveIntensity: 0.28, roughness: 0.48, metalness: 0.08 });
-    addBlock(group, width * 0.82, 0.42, depth * 0.48, 0, 0.24, 0.22, stage);
-    for (let i = 0; i < 5; i += 1) {
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(1.55 + i * 0.14, 0.08, 8, 40, Math.PI), shell.clone());
-        rib.position.set(0, 1.18, -depth * 0.05 + i * 0.16);
-        rib.scale.y = 0.78;
-        rib.castShadow = true;
-        group.add(rib);
-    }
-    for (let i = -1; i <= 1; i += 2) {
-        const beam = new THREE.Mesh(new THREE.ConeGeometry(0.18, 3.4, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff5a3, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }));
-        beam.position.set(i * width * 0.28, 1.8, -depth * 0.25);
-        beam.rotation.z = i * 0.35;
-        group.add(beam);
-    }
-    const note = createTextSprite('♫', { background: 'rgba(255,255,255,.0)', color: '#ffffff', accent: '#ff66c4', square: true });
-    note.position.set(width * 0.28, 2.75, -depth * 0.1);
-    group.add(note);
-    addWindows(group, width * 0.6, 1.2, depth * 0.3, 0.4, 1, building.id);
-}
-function createMixedUseTower(group, building, width, depth, height) {
-    const glass = new THREE.MeshStandardMaterial({ color: 0x3db8ff, emissive: 0x071d55, emissiveIntensity: 0.3, roughness: 0.22, metalness: 0.28, transparent: true, opacity: 0.9 });
-    const cap = new THREE.MeshStandardMaterial({ color: 0xb2ffda, emissive: 0x35ffc3, emissiveIntensity: 0.32, roughness: 0.36, metalness: 0.14 });
-    const lowerH = height * 0.52;
-    const midH = height * 0.3;
-    const topH = height * 0.18;
-    addBlock(group, width * 0.72, lowerH, depth * 0.72, 0, lowerH / 2, 0, glass);
-    addBlock(group, width * 0.58, midH, depth * 0.58, width * 0.04, lowerH + midH / 2, -depth * 0.03, glass.clone());
-    addBlock(group, width * 0.44, topH, depth * 0.44, -width * 0.02, lowerH + midH + topH / 2, 0.02, cap);
-    addWindows(group, width * 0.72, lowerH - 0.2, depth * 0.72, 0.12, Math.floor(lowerH), `${building.id}:a`);
-    addWindows(group, width * 0.58, midH - 0.2, depth * 0.58, lowerH, Math.floor(midH), `${building.id}:b`);
-    addWindows(group, width * 0.44, topH - 0.1, depth * 0.44, lowerH + midH, Math.floor(topH), `${building.id}:c`);
-    const sign = createTextSprite('MOLT', { background: 'rgba(255,255,255,.82)', color: '#19224f', accent: '#35ffc3' });
-    sign.position.set(0, lowerH + midH * 0.45, -depth * 0.39);
-    sign.scale.multiplyScalar(0.54);
-    group.add(sign);
-    addAntenna(group, 0, height + 0.18, 0, 0x35ffc3);
-}
-function createGenericBuilding(group, building, width, depth, height) {
-    const material = new THREE.MeshStandardMaterial({ color: 0x928bff, roughness: 0.52, metalness: 0.12 });
-    addBlock(group, width * 0.72, height, depth * 0.72, 0, height / 2, 0, material);
-    addWindows(group, width * 0.72, height - 0.2, depth * 0.72, 0.12, Math.floor(height), building.id);
-}
-function addConstructionOverlay(group, width, depth, height) {
-    const scaffoldMat = new THREE.MeshStandardMaterial({ color: 0xffd166, roughness: 0.48, metalness: 0.38 });
-    for (const x of [-width * 0.42, width * 0.42]) {
-        for (const z of [-depth * 0.42, depth * 0.42]) {
-            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, height + 0.7, 8), scaffoldMat.clone());
-            post.position.set(x, (height + 0.7) / 2, z);
-            post.castShadow = true;
-            group.add(post);
-        }
-    }
-    const crane = new THREE.Group();
-    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.18, height + 2.8, 0.18), scaffoldMat.clone());
-    mast.position.set(width * 0.58, (height + 2.8) / 2, depth * 0.42);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(width * 1.2, 0.16, 0.16), scaffoldMat.clone());
-    arm.position.set(width * 0.14, height + 2.7, depth * 0.42);
-    const cable = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.2, 0.035), new THREE.MeshStandardMaterial({ color: 0x37384c, roughness: 0.3, metalness: 0.5 }));
-    cable.position.set(-width * 0.22, height + 2.05, depth * 0.42);
-    crane.add(mast, arm, cable);
-    group.add(crane);
-}
-function addBlock(group, width, height, depth, x, y, z, material) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-    return mesh;
-}
-function addWindows(group, width, height, depth, baseY, rowsHint, seed) {
-    const litMaterial = new THREE.MeshStandardMaterial({ color: 0xeaffff, emissive: 0x77ffeb, emissiveIntensity: 1.35, roughness: 0.32 });
-    const dimMaterial = new THREE.MeshStandardMaterial({ color: 0x31516f, emissive: 0x274867, emissiveIntensity: 0.22, roughness: 0.42 });
-    const rows = Math.max(1, Math.min(16, rowsHint || Math.floor(height / 0.9)));
-    const colsFront = Math.max(2, Math.floor(width / 0.72));
-    const colsSide = Math.max(2, Math.floor(depth / 0.75));
-    const windowGeo = new THREE.PlaneGeometry(0.3, 0.38);
-    for (let row = 0; row < rows; row += 1) {
-        const y = baseY + 0.52 + (row + 0.5) * Math.max(0.46, (height - 0.66) / rows);
-        for (let col = 0; col < colsFront; col += 1) {
-            const x = -width * 0.38 + (col / Math.max(1, colsFront - 1)) * width * 0.76;
-            const lit = seededChance(seed, row * 31 + col) > 0.34;
-            const pane = new THREE.Mesh(windowGeo.clone(), lit ? litMaterial : dimMaterial);
-            pane.position.set(x, y, depth / 2 + 0.012);
-            group.add(pane);
-        }
-        for (let col = 0; col < colsSide; col += 1) {
-            const z = -depth * 0.33 + (col / Math.max(1, colsSide - 1)) * depth * 0.66;
-            const lit = seededChance(`${seed}:side`, row * 37 + col) > 0.42;
-            const pane = new THREE.Mesh(windowGeo.clone(), lit ? litMaterial : dimMaterial);
-            pane.rotation.y = Math.PI / 2;
-            pane.position.set(width / 2 + 0.012, y, z);
-            group.add(pane);
-        }
-    }
-}
-function addDoor(group, x, y, z, width, height, color) {
-    const door = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.12 }));
-    door.position.set(x, y, z - 0.012);
-    group.add(door);
-}
-function addNeonStrip(group, x, y, z, width, color) {
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(width, 0.09, 0.06), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.4, roughness: 0.28 }));
-    strip.position.set(x, y, z);
-    group.add(strip);
-}
-function addAntenna(group, x, y, z, color) {
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.25, 8), new THREE.MeshStandardMaterial({ color: 0x24304f, roughness: 0.42, metalness: 0.6 }));
-    mast.position.set(x, y + 0.58, z);
-    group.add(mast);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 8), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.6 }));
-    bulb.position.set(x, y + 1.25, z);
-    group.add(bulb);
-}
-function addRooftopGarden(group, width, depth, height) {
-    const garden = new THREE.Mesh(new THREE.BoxGeometry(width * 0.54, 0.18, depth * 0.46), new THREE.MeshStandardMaterial({ color: 0x58d274, roughness: 0.85 }));
-    garden.position.set(width * 0.06, height + 0.14, depth * 0.02);
-    garden.receiveShadow = true;
-    group.add(garden);
-    for (let i = 0; i < 4; i += 1) {
-        const tree = createTree(0.3);
-        tree.position.set(-width * 0.18 + i * width * 0.11, height + 0.28, depth * 0.12 * (i % 2 ? 1 : -1));
-        group.add(tree);
-    }
-}
-function addPatioSet(group, x, z) {
-    const tableMat = new THREE.MeshStandardMaterial({ color: 0xfff6d6, roughness: 0.5 });
-    const table = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 20), tableMat);
-    table.position.set(x, 0.48, z);
-    group.add(table);
-    const umbrella = new THREE.Mesh(new THREE.ConeGeometry(0.54, 0.28, 24), new THREE.MeshStandardMaterial({ color: 0xff66a5, roughness: 0.55 }));
-    umbrella.position.set(x, 0.86, z);
-    group.add(umbrella);
-}
-function createTree(scale = 1) {
-    const group = new THREE.Group();
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * scale, 0.13 * scale, 0.7 * scale, 8), new THREE.MeshStandardMaterial({ color: 0x8b5e3c, roughness: 0.82 }));
-    trunk.position.y = 0.35 * scale;
-    const crown = new THREE.Mesh(new THREE.ConeGeometry(0.56 * scale, 1.12 * scale, 12), new THREE.MeshStandardMaterial({ color: 0x22a861, roughness: 0.86 }));
-    crown.position.y = 1.08 * scale;
-    trunk.castShadow = true;
-    crown.castShadow = true;
-    group.add(trunk, crown);
-    return group;
-}
-function createSteamPuff(scale) {
-    const sprite = createCircleSprite('rgba(255,255,255,.68)');
-    sprite.scale.set(scale, scale * 0.76, scale);
-    return sprite;
-}
-function createPony() {
-    const group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55 });
-    const maneMat = new THREE.MeshStandardMaterial({ color: 0xff66c4, emissive: 0xff66c4, emissiveIntensity: 0.22, roughness: 0.5 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 12), bodyMat);
-    body.scale.set(1.45, 0.74, 0.72);
-    body.castShadow = true;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 16, 10), bodyMat);
-    head.position.set(0.52, 0.27, 0.02);
-    head.castShadow = true;
-    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.32, 12), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffd166, emissiveIntensity: 0.4 }));
-    horn.position.set(0.62, 0.54, 0.02);
-    const mane = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), maneMat);
-    mane.scale.set(0.5, 1.4, 0.45);
-    mane.position.set(0.32, 0.34, 0.05);
-    group.add(body, head, horn, mane);
-    return group;
 }
 function createNpcModel(npc) {
     const group = new THREE.Group();
@@ -1067,192 +626,17 @@ function activityIcon(npc) {
         return '→';
     return '';
 }
-function createCar(color) {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.34, 0.56), new THREE.MeshStandardMaterial({ color, roughness: 0.38, metalness: 0.22 }));
-    body.position.y = 0.28;
-    body.castShadow = true;
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.26, 0.42), new THREE.MeshStandardMaterial({ color: 0xdff9ff, emissive: 0x89e8ff, emissiveIntensity: 0.2, roughness: 0.15, metalness: 0.08 }));
-    cabin.position.set(-0.05, 0.56, 0);
-    cabin.castShadow = true;
-    const lights = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.4), new THREE.MeshStandardMaterial({ color: 0xfff3a3, emissive: 0xfff3a3, emissiveIntensity: 1 }));
-    lights.position.set(0.56, 0.3, 0);
-    group.add(body, cabin, lights);
-    return group;
-}
-function updateTrafficActor(actor, elapsed) {
+function updateTrafficActor(actor, elapsed, y) {
     const u = (elapsed * actor.speed + actor.phase) % 1;
     const t = actor.direction === 1 ? u : 1 - u;
     if (actor.axis === 'x') {
-        actor.group.position.set(actor.min + (actor.max - actor.min) * t, 0.18, actor.fixed + actor.laneOffset);
+        actor.group.position.set(actor.min + (actor.max - actor.min) * t, y, actor.fixed + actor.laneOffset);
         actor.group.rotation.y = actor.direction === 1 ? 0 : Math.PI;
     }
     else {
-        actor.group.position.set(actor.fixed + actor.laneOffset, 0.18, actor.min + (actor.max - actor.min) * t);
+        actor.group.position.set(actor.fixed + actor.laneOffset, y, actor.min + (actor.max - actor.min) * t);
         actor.group.rotation.y = actor.direction === 1 ? -Math.PI / 2 : Math.PI / 2;
     }
-}
-function createBoat(color) {
-    const group = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.34, 0.72), new THREE.MeshStandardMaterial({ color, roughness: 0.46, metalness: 0.08 }));
-    hull.position.y = 0.18;
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.46, 0.52), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.32 }));
-    cabin.position.set(-0.25, 0.58, 0);
-    const wake = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.38), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide }));
-    wake.rotation.x = -Math.PI / 2;
-    wake.position.set(-1.4, 0.02, 0);
-    group.add(hull, cabin, wake);
-    return group;
-}
-function createCloudSprite(scale) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        const gradient = ctx.createRadialGradient(96, 58, 8, 96, 58, 94);
-        gradient.addColorStop(0, 'rgba(255,255,255,.94)');
-        gradient.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.ellipse(84, 72, 58, 28, 0, 0, Math.PI * 2);
-        ctx.ellipse(126, 58, 48, 34, 0, 0, Math.PI * 2);
-        ctx.ellipse(168, 72, 55, 26, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.68, depthWrite: false }));
-    sprite.scale.set(13 * scale, 6.5 * scale, 1);
-    return sprite;
-}
-function createCircleSprite(color) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 96;
-    canvas.height = 96;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        const gradient = ctx.createRadialGradient(48, 48, 4, 48, 48, 46);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 96, 96);
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
-}
-function createTextSprite(text, options) {
-    const canvas = document.createElement('canvas');
-    const width = options.square ? 128 : 512;
-    const height = options.square ? 128 : 150;
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        ctx.clearRect(0, 0, width, height);
-        const radius = options.square ? 58 : 42;
-        drawRoundedRect(ctx, 10, 10, width - 20, height - 20, radius, options.background);
-        ctx.strokeStyle = options.accent;
-        ctx.lineWidth = options.square ? 8 : 6;
-        ctx.stroke();
-        ctx.fillStyle = options.color;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = options.square ? '900 70px Inter, system-ui, sans-serif' : '900 46px Inter, system-ui, sans-serif';
-        ctx.fillText(text, width / 2, height / 2 + (options.square ? 1 : 3), width - 42);
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.minFilter = THREE.LinearFilter;
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(options.square ? 1.25 : 5.1, options.square ? 1.25 : 1.5, 1);
-    return sprite;
-}
-function drawRoundedRect(ctx, x, y, width, height, radius, fill) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.arcTo(x + width, y, x + width, y + height, radius);
-    ctx.arcTo(x + width, y + height, x, y + height, radius);
-    ctx.arcTo(x, y + height, x, y, radius);
-    ctx.arcTo(x, y, x + width, y, radius);
-    ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
-}
-function createTerrainTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        const gradient = ctx.createLinearGradient(0, 0, 512, 512);
-        gradient.addColorStop(0, '#82d56e');
-        gradient.addColorStop(0.45, '#44bb68');
-        gradient.addColorStop(1, '#27955a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 512);
-        ctx.globalAlpha = 0.14;
-        for (let i = 0; i < 720; i += 1) {
-            const x = (i * 37) % 512;
-            const y = (i * 91) % 512;
-            ctx.fillStyle = i % 3 ? '#e8ffdc' : '#167947';
-            ctx.fillRect(x, y, 1 + (i % 2), 1 + (i % 3));
-        }
-        ctx.globalAlpha = 0.08;
-        ctx.strokeStyle = '#eaffdd';
-        for (let i = -512; i < 900; i += 52) {
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i + 512, 512);
-            ctx.stroke();
-        }
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(3, 2.5);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
-}
-function createWaterMaterial() {
-    return new THREE.ShaderMaterial({
-        uniforms: {
-            uTime: { value: 0 },
-            uColorA: { value: new THREE.Color(0x064fae) },
-            uColorB: { value: new THREE.Color(0x17b9d6) },
-        },
-        vertexShader: `
-      uniform float uTime;
-      varying vec2 vUv;
-      varying float vWave;
-      void main() {
-        vUv = uv;
-        vec3 p = position;
-        float wave = sin(p.x * 0.26 + uTime * 1.15) * 0.16 + sin(p.y * 0.41 - uTime * 1.45) * 0.08;
-        p.z += wave;
-        vWave = wave;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      }
-    `,
-        fragmentShader: `
-      uniform vec3 uColorA;
-      uniform vec3 uColorB;
-      uniform float uTime;
-      varying vec2 vUv;
-      varying float vWave;
-      void main() {
-        float stripes = smoothstep(0.96, 1.0, sin((vUv.y + vUv.x * 0.22) * 78.0 - uTime * 2.6));
-        float glint = smoothstep(0.74, 1.0, sin(vUv.x * 18.0 + uTime) * sin(vUv.y * 26.0 - uTime * 0.7));
-        vec3 color = mix(uColorA, uColorB, vUv.x * 0.72 + 0.18 + vWave * 0.4);
-        color += vec3(0.28, 0.62, 0.78) * stripes * 0.26;
-        color += vec3(0.96, 0.9, 0.54) * glint * 0.09;
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `,
-        side: THREE.DoubleSide,
-    });
 }
 function createSparkleCloud(center, color, count = 90, radius = 8) {
     const positions = new Float32Array(count * 3);
@@ -1313,25 +697,14 @@ function disposeObject(object) {
 }
 function disposeMaterial(material) {
     for (const value of Object.values(material)) {
-        if (value instanceof THREE.Texture)
+        if (value instanceof THREE.Texture && !value.userData.persistent)
             value.dispose();
     }
     material.dispose();
 }
-function seededChance(seed, index) {
-    return hashFloat(`${seed}:${index}`);
-}
-function hashFloat(input) {
-    let hash = 2166136261;
-    for (let i = 0; i < input.length; i += 1) {
-        hash ^= input.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
-    }
-    return ((hash >>> 0) % 10000) / 10000;
-}
-function shortLabel(label) {
-    return label.length > 22 ? `${label.slice(0, 20)}…` : label;
-}
+// ---------------------------------------------------------------------------
+// Cinematic preview world shown before the API wakes up
+// ---------------------------------------------------------------------------
 function createPreviewWorld() {
     const districts = ['Marina', 'Garage Hills', 'Prompt Park', 'Downtown Token Exchange', 'Research Row', 'Bayfront'];
     const zones = ['commercial', 'residential', 'park', 'mixed', 'industrial', 'civic'];
@@ -1384,6 +757,50 @@ function createPreviewWorld() {
         lot.ownerId = 'city';
         return [building];
     });
+    // Showcase companies so billboards + evolution stages render out of the box
+    const companyPresets = [
+        { lotIndex: 3, name: 'Froogle', archetype: 'search', stage: 'public-ish', valuation: 860_000, marketShare: 46, research: 5_200, cash: 240_000 },
+        { lotIndex: 10, name: 'ClosedAI', archetype: 'frontier_ai', stage: 'growth', valuation: 320_000, marketShare: 22, research: 8_400, cash: 90_000 },
+        { lotIndex: 8, name: 'Faceplant', archetype: 'social', stage: 'failed', valuation: 1_200, marketShare: 1, research: 120, cash: 14 },
+        { lotIndex: 22, name: 'Salesfarce', archetype: 'enterprise', stage: 'series_a', valuation: 64_000, marketShare: 9, research: 900, cash: 22_000 },
+        { lotIndex: 7, name: 'DoorDashund', archetype: 'local_services', stage: 'seed', valuation: 9_000, marketShare: 3, research: 80, cash: 3_200 },
+        { lotIndex: 1, name: 'Coinbasement', archetype: 'finance', stage: 'garage', valuation: 1_500, marketShare: 0, research: 10, cash: 800 },
+        { lotIndex: 16, name: 'Nvidiyikes', archetype: 'robotics', stage: 'growth', valuation: 280_000, marketShare: 31, research: 4_800, cash: 130_000 },
+    ];
+    const companies = companyPresets.flatMap((preset, index) => {
+        const lot = lots[preset.lotIndex];
+        const building = buildings.find((candidate) => candidate.lotId === lot?.id);
+        if (!lot || !building)
+            return [];
+        const company = {
+            id: `preview_company_${index + 1}`,
+            name: preset.name,
+            archetype: preset.archetype,
+            ownerId: 'city',
+            lotId: lot.id,
+            buildingId: building.id,
+            stage: preset.stage,
+            valuation: preset.valuation,
+            revenue: preset.valuation / 12,
+            cash: preset.cash,
+            employees: Math.max(1, Math.round(preset.valuation / 8_000)),
+            sentiment: preset.stage === 'failed' ? 8 : 68,
+            risk: preset.stage === 'failed' ? 96 : 34,
+            foundedAtTick: 4,
+            investors: {},
+            wage: 62,
+            price: 20,
+            productQuality: preset.stage === 'failed' ? 12 : 70,
+            marketShare: preset.marketShare,
+            employeeHappiness: preset.stage === 'failed' ? 5 : 72,
+            customerSatisfaction: preset.stage === 'failed' ? 10 : 66,
+            computeUsage: 12,
+            environmentalImpact: 8,
+            legalRisk: 12,
+            research: preset.research,
+        };
+        return [company];
+    });
     const npcNames = ['Ada', 'Grace', 'Linus', 'Katherine', 'Alan', 'Radia', 'Timnit', 'Yukihiro', 'Barbara', 'Donald', 'Margaret', 'Edsger', 'Frances', 'Ken', 'Adele', 'Claude', 'Mary', 'Guido'];
     const activities = ['commuting', 'working', 'shopping', 'concert', 'home', 'rally'];
     const npcs = npcNames.map((name, index) => {
@@ -1419,7 +836,7 @@ function createPreviewWorld() {
         npcs,
         lots,
         buildings,
-        companies: [],
+        companies,
         policies: [],
         policyProposals: [],
         election: { cycle: 1, nextTick: 48, candidates: [] },

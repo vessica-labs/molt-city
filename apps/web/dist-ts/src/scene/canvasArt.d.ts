@@ -1,0 +1,31 @@
+import * as THREE from 'three';
+import type { Company, CompanyArchetype } from '@molt-city/shared';
+export declare function hashFloat(input: string): number;
+export declare function hashPick<T>(items: readonly T[], seed: string): T;
+export declare function seededChance(seed: string, index: number): number;
+export declare function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void;
+export type CompanyStage = Company['stage'];
+export type BrandKit = {
+    primary: string;
+    secondary: string;
+    glow: number;
+    tagline: string;
+    stageLabel: string;
+};
+export declare function companyBrand(company: Pick<Company, 'name' | 'archetype' | 'stage'>): BrandKit;
+export declare function drawCompanyLogo(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, archetype: CompanyArchetype, seed: string, primary: string, secondary: string): void;
+export declare function createBillboardTexture(company: Pick<Company, 'name' | 'archetype' | 'stage'>, brand: BrandKit): THREE.CanvasTexture;
+export declare function createFacadeSignTexture(name: string, brand: BrandKit, failed: boolean): THREE.CanvasTexture;
+export declare function createTextSprite(text: string, options: {
+    background: string;
+    color: string;
+    accent: string;
+    square?: boolean;
+    font?: string;
+}): THREE.Sprite<THREE.Object3DEventMap>;
+export declare function createGagSignTexture(lines: string[], style: 'cardboard' | 'banner' | 'neon' | 'caution'): THREE.CanvasTexture;
+export declare function createTerrainTexture(): THREE.CanvasTexture;
+export declare function createSkyTexture(): THREE.CanvasTexture;
+export declare function createCloudSprite(scale: number): THREE.Sprite;
+export declare function createFogSprite(scale: number): THREE.Sprite;
+export declare function createCircleSprite(color: string): THREE.Sprite;
